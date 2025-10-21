@@ -5,6 +5,20 @@ EX_LED = Pin(15, Pin.OUT)
 # ============================================================================ 
 # Sender Test Example
 # ============================================================================ 
+name_index = 0  # Change this index to select different names from the files
+try:
+    with open("eggs_names.txt", "r") as f:
+        # collect non-empty lines and strip whitespace
+        lines = [line.strip() for line in f if line.strip()]
+        # get the second name (index 1) if available
+        if len(lines) >= name_index:
+            egg_name = lines[name_index]
+        else:
+            egg_name = "Unknown"
+except Exception as e:
+    print("Could not read eggs_names.txt:", e)
+    egg_name = "Unknown"
+
 if __name__ == "__main__": 
     # This example is designed for a MicroPython environment with an SX127x connected. 
     # Adjust the SPI bus and pin numbers as per your hardware configuration.
@@ -31,10 +45,18 @@ if __name__ == "__main__":
         
         # ------------------------- Transmitting Test Message ----------------
         Counter = 0
+        
         while True:
-            test_message = f"Hello From Faberge : {Counter}!"
+            try:
+                message = input("Press Enter to send a test message...")
+            except Exception as e:
+                print("Input error:", e)
+                message = None  # Proceed to send message without waiting for input
+
+
+            test_message = f"Hello From {egg_name}: {Counter}!"
             print("\n----- Transmitting Message -----")
-            print(f"Message: {test_message}")
+            print(f"Message from {egg_name}: {message}")
             
             # Send the message via LoRa
             lora.println(test_message)
