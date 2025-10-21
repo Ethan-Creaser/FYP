@@ -4,7 +4,7 @@ This library provides functionalities for configuring and communicating with the
 It supports functions for setting frequency, TX power, bandwidth, spreading factor, etc.,
 as well as packet transmission and reception.
 
-https://github.com/armanghobadi/ulora
+https://github.com/armanghobadi/ulora/
 
 """
 
@@ -13,6 +13,8 @@ import machine
 from machine import SPI, Pin
 from utime import ticks_ms, sleep_ms  # ticks_ms and sleep_ms imported from utime
 from micropython import const
+
+EX_LED = Pin(15, Pin.OUT)
 
 # ============================================================================
 # SX127x Register Definitions
@@ -106,7 +108,7 @@ DEFAULT_PARAMETERS = {
     "enable_CRC": True,
     "invert_IQ": False,
 }
-
+print(DEFAULT_PARAMETERS)
 # ============================================================================
 # ULoRa Class Definition
 # ============================================================================

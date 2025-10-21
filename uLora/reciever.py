@@ -2,6 +2,8 @@ from machine import Pin, SPI
 from time import sleep
 from ulora.core import ULoRa  # Ensure the ULoRa class is implemented and imported correctly
 
+EX_LED = Pin(15, Pin.OUT)
+
 # ============================================================================ 
 # Receiver Test Example
 # ============================================================================ 
@@ -14,7 +16,7 @@ if __name__ == "__main__":
         # Initialize SPI with specified SCK, MOSI, MISO pins.
         spi = SPI(1, baudrate=5000000, polarity=0, phase=0,
                   sck=Pin(10), mosi=Pin(11), miso=Pin(12))
-        print("SPI bus initialized with SCK: 25, MOSI: 27, MISO: 26.")
+        print(f"SPI bus initialized with SCK 10, MOSI: 11, MISO: 12.")
         
         # ------------------------- Defining Pin Mappings --------------------
         print("Setting up pin configurations...")
@@ -39,9 +41,14 @@ if __name__ == "__main__":
         
         # ------------------------- Handling Received Message -----------------
         if payload:
+            EX_LED.on()
             # If a message is received, print it
             print(f"Received payload: {payload}")
+            #print(f"RSSI (R) : {lora.packet_rssi()} dBm")
+            #print(f"SNR (Singal To Noise): {lora.packet_snr()} dB")
+
         else:
+            EX_LED.off()
             # If no message is received within the timeout period
             print("No payload received within the timeout period.")
     

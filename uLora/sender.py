@@ -1,7 +1,7 @@
 from machine import Pin, SPI
 from time import sleep
 from ulora.core import ULoRa  # Ensure the ULoRa class is implemented and imported correctly
-
+EX_LED = Pin(15, Pin.OUT)
 # ============================================================================ 
 # Sender Test Example
 # ============================================================================ 
@@ -13,7 +13,7 @@ if __name__ == "__main__":
         print("Initializing SPI bus...")
         spi = SPI(1, baudrate=5000000, polarity=0, phase=0,
                   sck=Pin(10), mosi=Pin(11), miso=Pin(12))
-        print("SPI bus initialized with SCK: 25, MOSI: 27, MISO: 26.")
+        print(f"SPI bus initialized with SCK 10, MOSI: 11, MISO: 12.")
         
         # ------------------------- Defining Pin Mappings --------------------
         print("Setting up pin configurations...")
@@ -30,8 +30,9 @@ if __name__ == "__main__":
         print("ULoRa instance created successfully.")
         
         # ------------------------- Transmitting Test Message ----------------
+        Counter = 0
         while True:
-            test_message = "Hello From faberge!"
+            test_message = f"Hello From Faberge : {Counter}!"
             print("\n----- Transmitting Message -----")
             print(f"Message: {test_message}")
             
@@ -40,6 +41,8 @@ if __name__ == "__main__":
             
             print("Message transmission complete.")
             print("---------------------------------------------------------------------\n")
+            Counter += 1
+            EX_LED.toggle()
              
 
     except Exception as e:
