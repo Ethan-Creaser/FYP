@@ -15,7 +15,7 @@ if __name__ == "__main__":
         print("Initializing SPI bus...")
         # Initialize SPI with specified SCK, MOSI, MISO pins.
         spi = SPI(1, baudrate=5000000, polarity=0, phase=0,
-                  sck=Pin(10), mosi=Pin(11), miso=Pin(12))
+                sck=Pin(10), mosi=Pin(11), miso=Pin(12))
         print(f"SPI bus initialized with SCK 10, MOSI: 11, MISO: 12.")
         
         # ------------------------- Defining Pin Mappings --------------------
@@ -33,25 +33,28 @@ if __name__ == "__main__":
         # Create a ULoRa instance with default parameters
         lora = ULoRa(spi, pins)
         print("ULoRa instance created successfully.")
-        
-        # ------------------------- Listening for Incoming Message ----------- 
-        print("\n----- Listening for Incoming Message -----")
-        # Listen for an incoming message with a 20-second timeout
-        payload = lora.listen(timeout=20000)  # 20000 ms = 20 seconds
-        
-        # ------------------------- Handling Received Message -----------------
-        if payload:
-            EX_LED.on()
-            # If a message is received, print it
-            print(f"Received payload: {payload}")
-            #print(f"RSSI (R) : {lora.packet_rssi()} dBm")
-            #print(f"SNR (Singal To Noise): {lora.packet_snr()} dB")
+            
+        while True:
 
-        else:
-            EX_LED.off()
-            # If no message is received within the timeout period
-            print("No payload received within the timeout period.")
-    
+            # ------------------------- Listening for Incoming Message ----------- 
+            print("\n----- Listening for Incoming Message -----")
+            # Listen for an incoming message with a 20-second timeout
+            payload = lora.listen(timeout=1000)  # 20000 ms = 20 seconds
+            
+            # ------------------------- Handling Received Message -----------------
+            if payload:
+                EX_LED.on()
+                # If a message is received, print it
+                print(f"Received payload: {payload}")
+                print(f"RSSI (R) : {lora.packet_rssi()} dBm")
+                print(f"SNR (Singal To Noise): {lora.packet_snr()} dB")
+
+            else:
+                EX_LED.off()
+                # If no message is received within the timeout period
+                print("No payload received within the timeout period.")
+        
+        
     except Exception as e:
         # ------------------------- Error Handling --------------------------
         print("Error during test:", e)

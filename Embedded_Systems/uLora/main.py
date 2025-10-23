@@ -49,19 +49,19 @@ if __name__ == "__main__":
         Counter = 0
         
         while True:
-            try:
-                message = input("Press Enter to send a test message... : ")
-                print(f"User input received: '{message}'")
-                if message == "":
-                    message = "None"
-            except Exception as e:
-                print("Input error:", e)
-                message = "None"  # Proceed to send message without waiting for input
+            # try:
+            #     message = input("Press Enter to send a test message... : ")
+            #     print(f"User input received: '{message}'")
+            #     if message == "":
+            #         message = "None"
+            # except Exception as e:
+            #     print("Input error:", e)
+            #     message = "None"  # Proceed to send message without waiting for input
 
 
             test_message = f"Hello From {egg_name}: {Counter}!"
             print("\n----- Transmitting Message -----")
-            print(f"Message from {egg_name}: {message}")
+            print(f"Message from {egg_name}: {test_message}")
             
             # Send the message via LoRa
             lora.println(test_message)
