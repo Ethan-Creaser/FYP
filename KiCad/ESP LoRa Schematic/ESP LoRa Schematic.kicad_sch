@@ -1,0 +1,3122 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "9.0")
+	(uuid "ce07f652-6589-4f44-9997-a411c7f830ad")
+	(paper "A4")
+	(lib_symbols
+		(symbol "ESP32-S3-DEVKITC-1-N8R8:ESP32-S3-DEVKITC-1-N8R8"
+			(pin_names
+				(offset 1.016)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "U"
+				(at -17.78 35.56 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Value" "ESP32-S3-DEVKITC-1-N8R8"
+				(at -17.78 -27.94 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left bottom)
+				)
+			)
+			(property "Footprint" "ESP32-S3-DEVKITC-1-N8R8:ESP32-S3-DEVKITC-1-N8R8"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "MF" "Espressif Systems"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Description_1" "The ESP32-S3-DEVKITC-1-N8R8 from Espressif Systems is a development board designed for RF, RFID, and wireless applications. It supports 802.11 b/g/n Wi-Fi and Bluetooth® 5.x (BLE) connectivity at 2.4GHz, making it ideal for IoT and wireless communication projects. This board is powered by the ESP32-S3-WROOM-1-N8R8 module, which features 8MB Quad SPI Flash and 8MB Octal SPI for efficient memory storage and processing."
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Package" "None"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Price" "None"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "SnapEDA_Link" "https://www.snapeda.com/parts/ESP32-S3-DEVKITC-1-N8R8/Espressif+Systems/view-part/?ref=snap"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "MP" "ESP32-S3-DEVKITC-1-N8R8"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Availability" "In Stock"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Check_prices" "https://www.snapeda.com/parts/ESP32-S3-DEVKITC-1-N8R8/Espressif+Systems/view-part/?ref=eda"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(symbol "ESP32-S3-DEVKITC-1-N8R8_0_0"
+				(rectangle
+					(start -17.78 -25.4)
+					(end 17.78 33.02)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(pin power_in line
+					(at -22.86 30.48 0)
+					(length 5.08)
+					(name "3V3"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_1"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at -22.86 27.94 0)
+					(length 5.08)
+					(name "3V3."
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_2"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin input line
+					(at -22.86 25.4 0)
+					(length 5.08)
+					(name "RST"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_3"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 22.86 0)
+					(length 5.08)
+					(name "GPIO4"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_4"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 20.32 0)
+					(length 5.08)
+					(name "GPIO5"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_5"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 17.78 0)
+					(length 5.08)
+					(name "GPIO6"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_6"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 15.24 0)
+					(length 5.08)
+					(name "GPIO7"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_7"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 12.7 0)
+					(length 5.08)
+					(name "GPIO15"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_8"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 10.16 0)
+					(length 5.08)
+					(name "GPIO16"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_9"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 7.62 0)
+					(length 5.08)
+					(name "GPIO17"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_10"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 5.08 0)
+					(length 5.08)
+					(name "GPIO18"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_11"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 2.54 0)
+					(length 5.08)
+					(name "GPIO8"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_12"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 0 0)
+					(length 5.08)
+					(name "GPIO3"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_13"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 -2.54 0)
+					(length 5.08)
+					(name "GPIO46"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_14"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 -5.08 0)
+					(length 5.08)
+					(name "GPIO9"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_15"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 -7.62 0)
+					(length 5.08)
+					(name "GPIO10"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_16"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 -10.16 0)
+					(length 5.08)
+					(name "GPIO11"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_17"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 -12.7 0)
+					(length 5.08)
+					(name "GPIO12"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_18"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 -15.24 0)
+					(length 5.08)
+					(name "GPIO13"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_19"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -22.86 -17.78 0)
+					(length 5.08)
+					(name "GPIO14"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_20"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at -22.86 -20.32 0)
+					(length 5.08)
+					(name "5V0"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_21"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at -22.86 -22.86 0)
+					(length 5.08)
+					(name "GND3"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J1_22"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 22.86 30.48 180)
+					(length 5.08)
+					(name "GND"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_1"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 27.94 180)
+					(length 5.08)
+					(name "U0TXD/GPIO43"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_2"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 25.4 180)
+					(length 5.08)
+					(name "U0RXD/GPIO44"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_3"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 22.86 180)
+					(length 5.08)
+					(name "GPIO1"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_4"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 20.32 180)
+					(length 5.08)
+					(name "GPIO2"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_5"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 17.78 180)
+					(length 5.08)
+					(name "MTMS/GPIO42"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_6"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 15.24 180)
+					(length 5.08)
+					(name "MTDI/GPIO41"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_7"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 12.7 180)
+					(length 5.08)
+					(name "MTDO/GPIO40"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_8"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 10.16 180)
+					(length 5.08)
+					(name "MTCK/GPIO39"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_9"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 7.62 180)
+					(length 5.08)
+					(name "GPIO38"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_10"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 5.08 180)
+					(length 5.08)
+					(name "GPIO37"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_11"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 2.54 180)
+					(length 5.08)
+					(name "GPIO36"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_12"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 0 180)
+					(length 5.08)
+					(name "GPIO35"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_13"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 -2.54 180)
+					(length 5.08)
+					(name "GPIO0"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_14"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 -5.08 180)
+					(length 5.08)
+					(name "GPIO45"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_15"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 -7.62 180)
+					(length 5.08)
+					(name "GPIO48"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_16"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 -10.16 180)
+					(length 5.08)
+					(name "GPIO47"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_17"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 -12.7 180)
+					(length 5.08)
+					(name "GPIO21"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_18"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 -15.24 180)
+					(length 5.08)
+					(name "USB_D+/GPIO20"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_19"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 22.86 -17.78 180)
+					(length 5.08)
+					(name "USB_D-/GPIO19"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_20"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 22.86 -20.32 180)
+					(length 5.08)
+					(name "GND1"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_21"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 22.86 -22.86 180)
+					(length 5.08)
+					(name "GND2"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "J3_22"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "RA-02_LORA:RA-02_LORA"
+			(pin_names
+				(offset 1.016)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "U"
+				(at -10.16 16.51 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left bottom)
+				)
+			)
+			(property "Value" "RA-02_LORA"
+				(at -10.16 -13.97 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Footprint" "RA-02_LORA:MODULE_RA-02_LORA"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "MF" "AI-Thinker"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "MAXIMUM_PACKAGE_HEIGHT" "3.3mm"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Package" "None"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Price" "None"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Check_prices" "https://www.snapeda.com/parts/Ra-02%20LoRa/AI-Thinker/view-part/?ref=eda"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "STANDARD" "Manufacturer Recommendations"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "PARTREV" "2018/03/02"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "SnapEDA_Link" "https://www.snapeda.com/parts/Ra-02%20LoRa/AI-Thinker/view-part/?ref=snap"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "MP" "Ra-02 LoRa"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Description_1" "Ra-02 LoRa RF M5Stack Platform Evaluation Expansion Board"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Availability" "Not in stock"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "MANUFACTURER" "Ai-Thinker"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(symbol "RA-02_LORA_0_0"
+				(rectangle
+					(start -10.16 -12.7)
+					(end 10.16 15.24)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(pin input line
+					(at -15.24 7.62 0)
+					(length 5.08)
+					(name "RESET"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin input line
+					(at -15.24 2.54 0)
+					(length 5.08)
+					(name "NSS"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "15"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin input clock
+					(at -15.24 0 0)
+					(length 5.08)
+					(name "SCK"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "12"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin input line
+					(at -15.24 -2.54 0)
+					(length 5.08)
+					(name "MOSI"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "14"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin output line
+					(at -15.24 -5.08 0)
+					(length 5.08)
+					(name "MISO"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "13"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 15.24 12.7 180)
+					(length 5.08)
+					(name "3.3V"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 7.62 180)
+					(length 5.08)
+					(name "DI00"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 5.08 180)
+					(length 5.08)
+					(name "DI01"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "6"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 2.54 180)
+					(length 5.08)
+					(name "DI02"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "7"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 0 180)
+					(length 5.08)
+					(name "DI03"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "8"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 -2.54 180)
+					(length 5.08)
+					(name "DI04"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "10"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 -5.08 180)
+					(length 5.08)
+					(name "DI05"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "11"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 15.24 -10.16 180)
+					(length 5.08)
+					(name "GND"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 15.24 -10.16 180)
+					(length 5.08)
+					(hide yes)
+					(name "GND"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "16"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 15.24 -10.16 180)
+					(length 5.08)
+					(hide yes)
+					(name "GND"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 15.24 -10.16 180)
+					(length 5.08)
+					(hide yes)
+					(name "GND"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "9"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "power:+3.3V"
+			(power)
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "#PWR"
+				(at 0 -3.81 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Value" "+3.3V"
+				(at 0 3.556 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "global power"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "+3.3V_0_1"
+				(polyline
+					(pts
+						(xy -0.762 1.27) (xy 0 2.54)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 2.54) (xy 0.762 1.27)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 0) (xy 0 2.54)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "+3.3V_1_1"
+				(pin power_in line
+					(at 0 0 90)
+					(length 0)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "power:GND"
+			(power)
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "#PWR"
+				(at 0 -6.35 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Value" "GND"
+				(at 0 -3.81 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "global power"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "GND_0_1"
+				(polyline
+					(pts
+						(xy 0 0) (xy 0 -1.27) (xy 1.27 -1.27) (xy 0 -2.54) (xy -1.27 -1.27) (xy 0 -1.27)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "GND_1_1"
+				(pin power_in line
+					(at 0 0 270)
+					(length 0)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+	)
+	(text "FSPID"
+		(exclude_from_sim no)
+		(at 49.022 81.026 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "040a5ec7-6de2-45b8-9c03-b49fb77279a9")
+	)
+	(text "FSPICLK"
+		(exclude_from_sim no)
+		(at 48.006 83.312 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "05a9fe04-33c9-43bf-bb96-128aec8465c3")
+	)
+	(text "RST"
+		(exclude_from_sim no)
+		(at 50.038 48.26 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "24b53360-aa19-453e-884e-a4b71aeae622")
+	)
+	(text "FSPICS0"
+		(exclude_from_sim no)
+		(at 47.752 78.486 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "3bd889e6-5ec7-4b20-8754-08314c9e4b69")
+	)
+	(text "FSPIQ"
+		(exclude_from_sim no)
+		(at 49.022 85.852 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "4c7ecaa6-3f8b-4836-a9eb-96c6c3e54f93")
+	)
+	(text "DIO0\n"
+		(exclude_from_sim no)
+		(at 50.038 50.8 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "744e0ae9-eef3-43ca-9a9e-2ec2ba3d0e18")
+	)
+	(no_connect
+		(at 109.22 48.26)
+		(uuid "0c17b214-588c-476c-9eec-840bd039260a")
+	)
+	(no_connect
+		(at 109.22 50.8)
+		(uuid "0dfd3a51-31aa-43a1-b727-00f99ffb9501")
+	)
+	(no_connect
+		(at 109.22 83.82)
+		(uuid "0e19bec7-c5d8-4293-b2af-1ddb11f9abf0")
+	)
+	(no_connect
+		(at 63.5 45.72)
+		(uuid "14e82be8-c31e-4cb1-ba7b-32b63d00b4b3")
+	)
+	(no_connect
+		(at 109.22 76.2)
+		(uuid "17e000e6-0ebc-40f9-8253-473958c3edc2")
+	)
+	(no_connect
+		(at 109.22 60.96)
+		(uuid "1b776e11-f024-4135-8b80-0339ed7c4427")
+	)
+	(no_connect
+		(at 180.34 71.12)
+		(uuid "20350fdd-bf44-4019-90fb-2e20f0cab7f4")
+	)
+	(no_connect
+		(at 109.22 73.66)
+		(uuid "237b0028-5d24-4e22-896d-63222fedb8da")
+	)
+	(no_connect
+		(at 63.5 55.88)
+		(uuid "2bde3de0-f120-409b-826c-1d88664cfba0")
+	)
+	(no_connect
+		(at 63.5 60.96)
+		(uuid "334fbd02-6ce6-4034-938a-acbc6630e84f")
+	)
+	(no_connect
+		(at 109.22 81.28)
+		(uuid "388f647a-b75e-46aa-b32d-6b30a8679a84")
+	)
+	(no_connect
+		(at 63.5 58.42)
+		(uuid "3cdee946-9a50-4b6a-aeae-aa84fa543ec0")
+	)
+	(no_connect
+		(at 63.5 93.98)
+		(uuid "42238bca-de87-402a-86c8-294e19327314")
+	)
+	(no_connect
+		(at 109.22 43.18)
+		(uuid "430889d0-5954-453c-bc25-0fb3e961b8cc")
+	)
+	(no_connect
+		(at 109.22 45.72)
+		(uuid "4d1ab83b-4bf5-42b4-afaa-81689b9ead37")
+	)
+	(no_connect
+		(at 180.34 73.66)
+		(uuid "683a19c6-11f7-481e-8a90-f531903dc270")
+	)
+	(no_connect
+		(at 180.34 68.58)
+		(uuid "6ebca715-3598-4b49-82d8-a87330323bb9")
+	)
+	(no_connect
+		(at 109.22 68.58)
+		(uuid "805f0f30-558d-4dd8-badc-19b71e1d8aa6")
+	)
+	(no_connect
+		(at 185.42 106.68)
+		(uuid "8216f157-22da-41fc-b850-019b982e1c9a")
+	)
+	(no_connect
+		(at 63.5 68.58)
+		(uuid "91fa6b63-730c-44df-8408-c080795a39f1")
+	)
+	(no_connect
+		(at 109.22 71.12)
+		(uuid "972ab964-b684-4ba3-bec5-01eccf8c1b81")
+	)
+	(no_connect
+		(at 109.22 53.34)
+		(uuid "9b325634-e672-403e-b42c-cfa4bab57b64")
+	)
+	(no_connect
+		(at 109.22 63.5)
+		(uuid "9d9edc25-7b7f-47c5-a92c-1fcf687da904")
+	)
+	(no_connect
+		(at 63.5 73.66)
+		(uuid "9da25dd3-c773-4c18-ae65-e47cf1957186")
+	)
+	(no_connect
+		(at 109.22 86.36)
+		(uuid "a9b1e9bc-efd4-447c-9c04-cd7eaa6db038")
+	)
+	(no_connect
+		(at 180.34 63.5)
+		(uuid "ac1b3f61-a0ab-44ce-998a-9de918608eac")
+	)
+	(no_connect
+		(at 63.5 43.18)
+		(uuid "adf4e50d-f9f3-482a-a4ed-3d4d3b5e93a2")
+	)
+	(no_connect
+		(at 109.22 78.74)
+		(uuid "ae1cbaae-e32f-4290-b963-31fd87a9ddcf")
+	)
+	(no_connect
+		(at 63.5 88.9)
+		(uuid "b13bf4aa-ddc8-4db8-b25b-55f0ac2275e9")
+	)
+	(no_connect
+		(at 63.5 76.2)
+		(uuid "bb8065fc-cbbd-481f-9e21-af6046ff44b3")
+	)
+	(no_connect
+		(at 109.22 88.9)
+		(uuid "bc55d597-a37c-4cff-868b-229e01028760")
+	)
+	(no_connect
+		(at 109.22 66.04)
+		(uuid "c5716836-0319-47fd-ba28-c91f88a043fc")
+	)
+	(no_connect
+		(at 109.22 91.44)
+		(uuid "c7a97011-0780-4008-aae7-5683d4410e17")
+	)
+	(no_connect
+		(at 63.5 71.12)
+		(uuid "cde20782-7ce3-4e1c-bd76-c7418f0f5e11")
+	)
+	(no_connect
+		(at 63.5 91.44)
+		(uuid "d7377086-22fa-43f5-8f27-2d81f43dcfa9")
+	)
+	(no_connect
+		(at 180.34 66.04)
+		(uuid "da95c14c-aac2-46e1-95ab-56f1f7c5c26f")
+	)
+	(no_connect
+		(at 63.5 53.34)
+		(uuid "db38d346-af60-49b9-adbd-facead777fea")
+	)
+	(no_connect
+		(at 109.22 55.88)
+		(uuid "dcc4f378-127b-41ef-b865-ffd271386d7f")
+	)
+	(no_connect
+		(at 63.5 66.04)
+		(uuid "e086aed3-4f92-44e4-843a-0806c77bc0b3")
+	)
+	(no_connect
+		(at 63.5 63.5)
+		(uuid "e8d9d8c8-4778-4ab9-b4d2-0d01be05a317")
+	)
+	(no_connect
+		(at 109.22 93.98)
+		(uuid "e9b732b9-d277-4e41-9b71-17419466dc87")
+	)
+	(no_connect
+		(at 109.22 58.42)
+		(uuid "f0a081fc-ff48-4875-8e81-69849fceb1b7")
+	)
+	(wire
+		(pts
+			(xy 125.73 40.64) (xy 125.73 46.99)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "001a351d-00ae-44ce-b236-a2b181eb79bb")
+	)
+	(wire
+		(pts
+			(xy 180.34 55.88) (xy 185.42 55.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "05001821-79c6-4020-9245-a99713252938")
+	)
+	(wire
+		(pts
+			(xy 59.69 78.74) (xy 63.5 78.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "05c8bfab-f1ca-44b3-a5b9-1c5fa998b67a")
+	)
+	(wire
+		(pts
+			(xy 146.05 68.58) (xy 149.86 68.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1297372f-c182-4394-96bd-1b5bb20c991a")
+	)
+	(wire
+		(pts
+			(xy 109.22 40.64) (xy 125.73 40.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "24f43837-1e74-4dd9-b211-bbd48181fd6d")
+	)
+	(wire
+		(pts
+			(xy 184.15 60.96) (xy 180.34 60.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2a9b6b8f-8cc4-422f-98ec-08ce288a7bea")
+	)
+	(wire
+		(pts
+			(xy 55.88 36.83) (xy 55.88 40.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "33ef7ce4-bf6d-4829-b0f4-31779abc5410")
+	)
+	(wire
+		(pts
+			(xy 146.05 73.66) (xy 149.86 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4c746c95-c079-47a3-b312-45141398ead4")
+	)
+	(wire
+		(pts
+			(xy 59.69 83.82) (xy 63.5 83.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5bf7a619-4b34-4e4f-a6fe-3967bbe61336")
+	)
+	(wire
+		(pts
+			(xy 59.69 50.8) (xy 63.5 50.8)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7e55fd72-b42d-4f5d-8f7d-ad1ca896493e")
+	)
+	(wire
+		(pts
+			(xy 190.5 85.09) (xy 190.5 78.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "85604e7e-41f9-4dc6-bac2-f53656567179")
+	)
+	(wire
+		(pts
+			(xy 59.69 48.26) (xy 63.5 48.26)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "99f34dd6-53ad-4f20-8c55-feb6ee897fea")
+	)
+	(wire
+		(pts
+			(xy 185.42 50.8) (xy 185.42 55.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9fef97f0-2ba7-4f40-b179-c7ef7c9a8f07")
+	)
+	(wire
+		(pts
+			(xy 59.69 86.36) (xy 63.5 86.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b5a71a6e-f8e0-4934-a842-ba9812fd9792")
+	)
+	(wire
+		(pts
+			(xy 55.88 40.64) (xy 63.5 40.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c5ef8d2c-4399-4187-aafe-1e11a85f9e2b")
+	)
+	(wire
+		(pts
+			(xy 146.05 66.04) (xy 149.86 66.04)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "db18ecd7-fca3-43c6-8ac3-ca05e8a9d907")
+	)
+	(wire
+		(pts
+			(xy 146.05 60.96) (xy 149.86 60.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e02947bf-7532-4d39-844b-fcb8d525f475")
+	)
+	(wire
+		(pts
+			(xy 59.69 81.28) (xy 63.5 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e1bda3e8-1bd0-41bf-9f9e-99f69c1fed5e")
+	)
+	(wire
+		(pts
+			(xy 146.05 71.12) (xy 149.86 71.12)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e684d483-5977-4f67-be30-c62f7e6ddbbf")
+	)
+	(wire
+		(pts
+			(xy 180.34 78.74) (xy 190.5 78.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fec8fda2-8764-407f-812d-33d19369611e")
+	)
+	(global_label "GPIO5"
+		(shape input)
+		(at 184.15 60.96 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left)
+		)
+		(uuid "1342f7b3-7cb2-443d-a2d9-ae77bc30f067")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 191.0857 60.96 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO5"
+		(shape input)
+		(at 59.69 50.8 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "19378d03-f892-42f6-92ed-535661ca17f1")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 52.7543 50.8 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO11"
+		(shape input)
+		(at 146.05 71.12 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "1ebd941f-330f-453f-9218-b2dbdb6d8163")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 138.1467 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO12"
+		(shape input)
+		(at 59.69 83.82 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "2c2fe540-e78c-48ee-9cca-baa9a5d52401")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 51.7867 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO12"
+		(shape input)
+		(at 146.05 68.58 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "58304092-9035-470c-b0fd-a60763a8a3a7")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 138.1467 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO4"
+		(shape input)
+		(at 59.69 48.26 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "6d66565d-b532-4718-9dbf-3dbe5918f917")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 52.7543 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO10"
+		(shape input)
+		(at 146.05 66.04 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "88ff91c3-e61b-47ba-9a8b-633bcf80d765")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 138.1467 66.04 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO10"
+		(shape input)
+		(at 59.69 78.74 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "8c3e2790-ce5d-4738-a3ef-97d4759dc111")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 51.7867 78.74 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO13"
+		(shape input)
+		(at 146.05 73.66 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "b50483fc-cba1-4f7b-9698-5c760a1f65b4")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 138.1467 73.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO13"
+		(shape input)
+		(at 59.69 86.36 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "b7c94f5c-e233-4291-9f2d-056f050220b3")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 51.7867 86.36 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO4"
+		(shape input)
+		(at 146.05 60.96 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "d72a8320-90f1-4c67-85a5-fe12ae1d36f4")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 139.1143 60.96 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO11"
+		(shape input)
+		(at 59.69 81.28 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "d97bed71-4143-4693-8ab7-db8e39a5d67f")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 51.7867 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 185.42 50.8 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "0e92dcf6-50e4-433a-8fb6-8b17f8760ee4")
+		(property "Reference" "#PWR04"
+			(at 185.42 54.61 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 185.42 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 185.42 50.8 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 185.42 50.8 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 185.42 50.8 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "949b1162-998f-43ea-a40a-c4769764cf02")
+		)
+		(instances
+			(project "ESP LoRa Schematic"
+				(path "/ce07f652-6589-4f44-9997-a411c7f830ad"
+					(reference "#PWR04")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 125.73 46.99 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "2d4358fc-9f6b-41b0-bcce-cba7034fa56e")
+		(property "Reference" "#PWR01"
+			(at 125.73 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 125.73 52.07 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 125.73 46.99 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 125.73 46.99 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 125.73 46.99 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "1e2d53c6-e955-4560-b19e-fb026af26f69")
+		)
+		(instances
+			(project ""
+				(path "/ce07f652-6589-4f44-9997-a411c7f830ad"
+					(reference "#PWR01")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 55.88 36.83 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "449ca756-5ce6-47e3-8fc9-a60d79f9cbfd")
+		(property "Reference" "#PWR03"
+			(at 55.88 40.64 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 55.88 31.75 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 55.88 36.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 55.88 36.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 55.88 36.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "16fc213c-b7fd-476b-a468-3ac6b8b58ade")
+		)
+		(instances
+			(project ""
+				(path "/ce07f652-6589-4f44-9997-a411c7f830ad"
+					(reference "#PWR03")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "ESP32-S3-DEVKITC-1-N8R8:ESP32-S3-DEVKITC-1-N8R8")
+		(at 86.36 71.12 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "6dce2607-9df8-4495-a55e-e86212bb3bf9")
+		(property "Reference" "U1"
+			(at 86.36 33.02 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "ESP32-S3-DEVKITC-1-N8R8"
+			(at 86.36 35.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "ESP32-S3-DEVKITC-1-N8R8:ESP32-S3-DEVKITC-1-N8R8"
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "MF" "Espressif Systems"
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Description_1" "The ESP32-S3-DEVKITC-1-N8R8 from Espressif Systems is a development board designed for RF, RFID, and wireless applications. It supports 802.11 b/g/n Wi-Fi and Bluetooth® 5.x (BLE) connectivity at 2.4GHz, making it ideal for IoT and wireless communication projects. This board is powered by the ESP32-S3-WROOM-1-N8R8 module, which features 8MB Quad SPI Flash and 8MB Octal SPI for efficient memory storage and processing."
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Package" "None"
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Price" "None"
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "SnapEDA_Link" "https://www.snapeda.com/parts/ESP32-S3-DEVKITC-1-N8R8/Espressif+Systems/view-part/?ref=snap"
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MP" "ESP32-S3-DEVKITC-1-N8R8"
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Availability" "In Stock"
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Check_prices" "https://www.snapeda.com/parts/ESP32-S3-DEVKITC-1-N8R8/Espressif+Systems/view-part/?ref=eda"
+			(at 86.36 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(pin "J1_2"
+			(uuid "e1e416f7-045f-4b68-85e9-df1617d5fbf1")
+		)
+		(pin "J1_1"
+			(uuid "ccc11c8e-0018-496f-9158-e07b06dda84b")
+		)
+		(pin "J1_3"
+			(uuid "6fe40eed-b287-43c7-82fb-afe31bf05200")
+		)
+		(pin "J1_4"
+			(uuid "d2c16c46-20d8-422c-9060-943ec9129ef9")
+		)
+		(pin "J1_5"
+			(uuid "16488d0c-6ae5-4d1f-b3e8-4ae2763d8344")
+		)
+		(pin "J1_21"
+			(uuid "319e1c40-4787-4014-b219-31ab5c65ee36")
+		)
+		(pin "J1_16"
+			(uuid "7002db5f-0e3d-46f4-badb-6b9f62f2fea7")
+		)
+		(pin "J1_13"
+			(uuid "76f5c9b0-a17b-47f0-b641-130f980482e6")
+		)
+		(pin "J3_5"
+			(uuid "c1a9ba1f-0ff3-443d-a9ea-19cf0f3a085d")
+		)
+		(pin "J3_8"
+			(uuid "41f1a9f2-e282-4aeb-8719-4f3ca0264798")
+		)
+		(pin "J3_2"
+			(uuid "751e2c0d-765f-488d-9f88-210cd6e3c528")
+		)
+		(pin "J3_7"
+			(uuid "f909b85e-416d-4a13-bddf-c4b7a32b1521")
+		)
+		(pin "J1_19"
+			(uuid "ef8deaae-8d17-4b29-a4a6-1e6fecdbc5b8")
+		)
+		(pin "J3_14"
+			(uuid "9ae86c4b-d980-4255-99eb-742ec93d59ed")
+		)
+		(pin "J3_16"
+			(uuid "c730d3ff-9e82-44e3-b86f-890ab4d29cbb")
+		)
+		(pin "J1_17"
+			(uuid "c1973844-f593-4eda-ba98-2e744f771fe7")
+		)
+		(pin "J3_13"
+			(uuid "e3ef1783-dec4-44d1-b273-5bff5a2ebff1")
+		)
+		(pin "J3_20"
+			(uuid "2a721a75-f47e-4d72-956d-12c64b19b53f")
+		)
+		(pin "J1_18"
+			(uuid "6de4bc93-b651-4bb4-8ae8-b1dd9deea02b")
+		)
+		(pin "J1_15"
+			(uuid "ec60b657-6bf3-459f-a182-c8b3fd6faa26")
+		)
+		(pin "J1_9"
+			(uuid "3677eaeb-6e88-416b-919f-929a7279f5dc")
+		)
+		(pin "J1_6"
+			(uuid "473d0053-51a2-4eb1-9e01-aa6a93efcda3")
+		)
+		(pin "J1_11"
+			(uuid "6b5460a8-7d16-456f-82dd-9e7fe7ac3e12")
+		)
+		(pin "J3_3"
+			(uuid "8702dde5-470b-4c32-a7ab-0f80560ac57e")
+		)
+		(pin "J1_12"
+			(uuid "b2f951fa-2e4f-406d-b10c-c56344ebc49d")
+		)
+		(pin "J1_7"
+			(uuid "4a052f25-370c-4a2f-b216-8db44ceeb815")
+		)
+		(pin "J1_10"
+			(uuid "f68b80b8-8606-49a0-851b-7a113cc5a402")
+		)
+		(pin "J1_14"
+			(uuid "af4714cd-7f87-4cde-a909-fd5e0323742e")
+		)
+		(pin "J1_8"
+			(uuid "a0073e0c-75e3-4dce-b889-af53284ada29")
+		)
+		(pin "J1_20"
+			(uuid "c9048ff0-f080-47fb-a528-b1016a8d8af0")
+		)
+		(pin "J1_22"
+			(uuid "0f508460-2dd7-48e6-b986-37aea6877893")
+		)
+		(pin "J3_1"
+			(uuid "b657ba47-d5ac-4d0c-9417-2d2718659c82")
+		)
+		(pin "J3_4"
+			(uuid "a4ee8df3-9b3a-49d0-addb-b68bca7edb02")
+		)
+		(pin "J3_6"
+			(uuid "3db7b3f7-c0ea-4b64-9837-d6f8c892aa02")
+		)
+		(pin "J3_9"
+			(uuid "d6fe674d-75e3-448e-a0fe-ea10c6bca60e")
+		)
+		(pin "J3_10"
+			(uuid "baca38c9-2f71-4a9e-87bf-f7ebda05b958")
+		)
+		(pin "J3_11"
+			(uuid "7a7b4c32-0b7d-4fe1-8ce0-aaef7bebe78d")
+		)
+		(pin "J3_12"
+			(uuid "f61e0134-cb08-41dc-b387-391b21c5579c")
+		)
+		(pin "J3_15"
+			(uuid "588530e2-001e-4a20-8402-d7f343c7aab8")
+		)
+		(pin "J3_17"
+			(uuid "a361c05a-e6c7-4e88-a665-9900703ad352")
+		)
+		(pin "J3_18"
+			(uuid "66251f08-a412-41f7-b531-94d6b74c217a")
+		)
+		(pin "J3_19"
+			(uuid "2d31e191-1309-486e-b361-5b5f71c10b08")
+		)
+		(pin "J3_22"
+			(uuid "68b48441-fc0f-4591-86f8-3928dc7e6125")
+		)
+		(pin "J3_21"
+			(uuid "6a35de22-2a7e-452b-b171-52a35efb13cf")
+		)
+		(instances
+			(project ""
+				(path "/ce07f652-6589-4f44-9997-a411c7f830ad"
+					(reference "U1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 190.5 85.09 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ba0fb272-8fb6-4db5-915c-68818270c2b2")
+		(property "Reference" "#PWR02"
+			(at 190.5 91.44 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 190.5 90.17 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 190.5 85.09 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 190.5 85.09 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 190.5 85.09 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "f110c545-ad4c-41ff-87a3-b7d3e317cab8")
+		)
+		(instances
+			(project "ESP LoRa Schematic"
+				(path "/ce07f652-6589-4f44-9997-a411c7f830ad"
+					(reference "#PWR02")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RA-02_LORA:RA-02_LORA")
+		(at 165.1 68.58 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "dd559e51-3f00-4273-9d6d-e8c960f90896")
+		(property "Reference" "U2"
+			(at 165.1 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "RA-02_LORA"
+			(at 165.1 50.8 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "RA-02_LORA:MODULE_RA-02_LORA"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "MF" "AI-Thinker"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MAXIMUM_PACKAGE_HEIGHT" "3.3mm"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Package" "None"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Price" "None"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Check_prices" "https://www.snapeda.com/parts/Ra-02%20LoRa/AI-Thinker/view-part/?ref=eda"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "STANDARD" "Manufacturer Recommendations"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "PARTREV" "2018/03/02"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "SnapEDA_Link" "https://www.snapeda.com/parts/Ra-02%20LoRa/AI-Thinker/view-part/?ref=snap"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MP" "Ra-02 LoRa"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Description_1" "Ra-02 LoRa RF M5Stack Platform Evaluation Expansion Board"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Availability" "Not in stock"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MANUFACTURER" "Ai-Thinker"
+			(at 165.1 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(pin "9"
+			(uuid "aa210d0d-0f7e-488c-b0b8-0920cf79f768")
+		)
+		(pin "14"
+			(uuid "be9aad23-a7c9-40c9-bfa1-ff416eaa46b2")
+		)
+		(pin "5"
+			(uuid "f7bd2cbf-f75e-42c0-a22e-2314f5a298d4")
+		)
+		(pin "8"
+			(uuid "4f3b35fc-275d-4a9c-a1f1-c0df9dd8da8e")
+		)
+		(pin "10"
+			(uuid "d442db8b-2793-4e11-aa15-23f174179f2f")
+		)
+		(pin "12"
+			(uuid "5e0dcada-52d8-45b1-a8b7-1b9d81811f96")
+		)
+		(pin "6"
+			(uuid "56925dbc-4d1e-4b66-a5fa-3de9170af611")
+		)
+		(pin "3"
+			(uuid "c5cd28a1-5652-4174-9057-6a1aeb835c7a")
+		)
+		(pin "7"
+			(uuid "d88e8b55-adb5-43c9-ae94-424aa2cdcb2d")
+		)
+		(pin "11"
+			(uuid "2ca3769f-2d82-45e0-aeec-b2f410f4ee87")
+		)
+		(pin "2"
+			(uuid "cddf3740-06c3-4235-90be-71f7a1fde0d2")
+		)
+		(pin "4"
+			(uuid "1e1a52b3-8578-43f3-b390-541a48ae819f")
+		)
+		(pin "15"
+			(uuid "db95db6b-d877-4ba0-baaa-31f13082c5f7")
+		)
+		(pin "13"
+			(uuid "19b791b6-19b1-4dea-9cc4-c94e2b9b46fc")
+		)
+		(pin "1"
+			(uuid "b28a2f03-f522-4707-bd99-661ad4370550")
+		)
+		(pin "16"
+			(uuid "a5b68989-2f4a-4ba7-86d1-00650627b9be")
+		)
+		(instances
+			(project ""
+				(path "/ce07f652-6589-4f44-9997-a411c7f830ad"
+					(reference "U2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)
