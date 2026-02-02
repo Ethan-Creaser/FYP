@@ -43,7 +43,7 @@ if __name__ == "__main__":
             
             # ------------------------- Handling Received Message -----------------
             if payload:
-                EX_LED.on()
+                #EX_LED.on()
                 # If a message is received, print it
                 print(f"Received payload: {payload}")
                 print(f"RSSI (R) : {lora.packet_rssi()} dBm")
