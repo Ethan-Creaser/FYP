@@ -3,21 +3,15 @@ from neopixel import NeoPixel
 import time
 from sx127x import SX127x
 
-
-
 # Setup NeoPixel
 
 led_pin = 38
 num_pixels = 1
 np = NeoPixel(Pin(led_pin, Pin.OUT), num_pixels)
 
-
-
-# Placeholder sensor (ADC)
+# Placeholder sensor
 
 sensor = ADC(Pin(1))
-
-
 
 # Setup LoRa (SX1278 RA-02)
 
@@ -64,14 +58,10 @@ def cycle_led():
 def read_sensor():
     """Return a simple sensor reading."""
     return sensor.read_u16()
-
-
 def send_lora_message(msg):
     """Send a LoRa packet."""
     lora.println(msg)
     print("sent:", msg)
-
-
 def check_lora_receive():
     """Check for incoming LoRa packets."""
     if lora.received_packet():
@@ -82,14 +72,10 @@ def check_lora_receive():
         np.write()
         time.sleep(0.2)
 
-
-
 # Main loop
 while True:
     cycle_led()
-
     value = read_sensor()
     message = "sensor=" + str(value)
     send_lora_message(message)
-
     check_lora_receive()
