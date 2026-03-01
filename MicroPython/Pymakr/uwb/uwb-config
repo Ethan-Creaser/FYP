@@ -1,0 +1,28 @@
+# this file contains base and tag configuration for the uwb BU03 boards using UART
+# list of AT commands https://core-electronics.com.au/attachments/uploads/bu03-at-commands.pdf
+# BU03 documentation https://core-electronics.com.au/attachments/uploads/CE10222_bu03-kit_v1.1.0_specification.pdf
+# Core Electronics Written and Video Guide https://core-electronics.com.au/guides/sensors/getting-started-with-ultra-wideband-and-measuring-distances-arduino-and-pico-guide/#configuring-the-bu03-boards
+# author: Ashika
+# last updated: 23/02/26
+
+from machine import UART, Pin
+import time
+
+uart = UART(1, baudrate=115200, tx=17, rx=18)
+
+# uart.write('AT') can be used to test if AT commands are sending successfully, refer to docs for more info
+# send_at('AT+RESTORE') # factory reset
+
+def send_at(cmd):
+    print(f"Sending: {cmd}")
+    uart.write(cmd + '\r\n')
+    time.sleep(1) # Give it time to respond
+    if uart.any():
+        res = uart.read()
+        print(f"Received: {res}")
+    else:
+        print("No response from BU03")
+
+send_at('AT+SETCFG=1,1,1,1\r\n') # ID, Role (0 = tag, 1 = base station), Channel, Rate
+send_at('AT+SAVE')
+send_at('AT+GETCFG')
