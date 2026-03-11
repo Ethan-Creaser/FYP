@@ -3301,6 +3301,16 @@
 		)
 		(uuid "69d32868-4a7c-406d-a2c3-1eef85335e5e")
 	)
+	(text "I2C SDA"
+		(exclude_from_sim no)
+		(at 50.8 60.96 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "6cb5825e-fc50-4f8b-9bc7-0ed6696efaba")
+	)
 	(text "Extra Ports"
 		(exclude_from_sim no)
 		(at 20.955 148.59 0)
@@ -3340,6 +3350,16 @@
 			)
 		)
 		(uuid "ae03d07b-f302-43b3-ac99-87ce03c38e4d")
+	)
+	(text "I2C SCL"
+		(exclude_from_sim no)
+		(at 50.8 68.58 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "b63b2726-c193-44ec-ac7f-da873ce6f3d9")
 	)
 	(text "DIO0\n"
 		(exclude_from_sim no)
@@ -3426,10 +3446,6 @@
 	(no_connect
 		(at 204.47 44.45)
 		(uuid "4ba9d5c5-f0b2-465a-b25e-303debfaceee")
-	)
-	(no_connect
-		(at 66.04 68.58)
-		(uuid "4c6fdf19-37e9-4ea6-b9df-d16e332a4414")
 	)
 	(no_connect
 		(at 236.22 36.83)
@@ -3590,10 +3606,6 @@
 	(no_connect
 		(at 66.04 81.28)
 		(uuid "c3addbf6-2905-4671-946f-9b9103339e11")
-	)
-	(no_connect
-		(at 66.04 60.96)
-		(uuid "c693a2bf-078c-4832-bfda-47a298eebd35")
 	)
 	(no_connect
 		(at 55.88 114.3)
@@ -3791,6 +3803,16 @@
 	)
 	(wire
 		(pts
+			(xy 62.23 60.96) (xy 66.04 60.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2e236b19-351b-42d3-9e2d-380d603ed1e3")
+	)
+	(wire
+		(pts
 			(xy 148.59 60.96) (xy 152.4 60.96)
 		)
 		(stroke
@@ -3848,6 +3870,16 @@
 			(type default)
 		)
 		(uuid "477d2087-a662-4b34-8c43-fe864325b524")
+	)
+	(wire
+		(pts
+			(xy 62.23 68.58) (xy 66.04 68.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "492fce4b-33e7-4507-b223-0d5bdbaa13a2")
 	)
 	(wire
 		(pts
@@ -4385,6 +4417,28 @@
 			)
 		)
 	)
+	(global_label "GPIO9"
+		(shape input)
+		(at 62.23 68.58 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "30de9ad7-3dde-4a8b-a139-ec372b3c5cb4")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 55.2943 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
 	(global_label "GPIO5"
 		(shape input)
 		(at 186.69 53.34 0)
@@ -4662,6 +4716,28 @@
 		(uuid "9e9c155f-7d18-4ba2-ac88-20d5adb61242")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 55.2943 40.64 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPIO8"
+		(shape input)
+		(at 62.23 60.96 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right)
+		)
+		(uuid "a0bdc142-46a1-4308-adb7-a71bc4eb7da7")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 55.2943 60.96 0)
 			(effects
 				(font
 					(size 1.27 1.27)
