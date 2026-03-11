@@ -1,4 +1,4 @@
-26455886681856457
+26468290651767115
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -13,6 +13,27 @@ audio belton reverb
 0
 7
 7
+BMI323
+BMI323_BOS
+
+BMI323 
+0
+14
+14
+BMI323
+BMI323_BOS-L
+
+BMI323 
+0
+14
+14
+BMI323
+BMI323_BOS-M
+
+BMI323 
+0
+14
+14
 BNO055
 SOT-23_DIO
 
@@ -46486,6 +46507,20 @@ Through hole socket strip THT 1x20 2.54mm single row
 0
 40
 40
+Connector_PinSocket_2.54mm
+Untitled
+
+
+0
+0
+0
+Connector_PinSocket_2.54mm
+Untitled_1
+
+
+0
+0
+0
 Connector_RJ
 RJ9_Evercom_5301-440xxx_Horizontal
 Evercom 5301-4P4C RJ9 receptacle, unshielded, https://datasheet.lcsc.com/lcsc/2207051802_EVERCOM-5301-4P4C_C3097715.pdf
@@ -59254,6 +59289,13 @@ ceramic
 0
 3
 3
+DM-OLED096-636 (1)
+MODULE_DM-OLED096-636
+
+
+0
+8
+8
 DMG2305UX
 SOT-23_DIO
 
@@ -92903,6 +92945,13 @@ Potentiometer vertical vishay
 0
 3
 3
+RF
+Lora_Dev_Board
+Through hole straight socket strip, 1x08, 2.54mm pitch, single row (from Kicad 4.0.7), script generated
+Through hole socket strip THT 1x08 2.54mm single row
+0
+16
+16
 RF
 Skyworks_SKY13575_639LF
 http://www.skyworksinc.com/uploads/documents/SKY13575_639LF_203270D.pdf
