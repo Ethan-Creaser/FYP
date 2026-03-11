@@ -30,11 +30,16 @@ class BU03:
     def verify_config(self, expected_id, expected_role):
         self.send_at('AT+GETCFG')
 
-    def read_distance(self):
-        if self.uart.any():
-            message = self.uart.read()
-            print(f"Raw data: {message}")
-            return self.decode_uwb_distances(message)
+    def read_distance(self, timeout_ms=200):
+        """Wait up to timeout_ms for data, then decode. Returns distances list or None."""
+        deadline = time.ticks_add(time.ticks_ms(), timeout_ms)
+        while time.ticks_diff(deadline, time.ticks_ms()) > 0:
+            if self.uart.any():
+                time.sleep_ms(20)  # let the full frame arrive
+                message = self.uart.read()
+                distances = self.decode_uwb_distances(message)
+                if distances is not None:
+                    return distances
         return None
 
     ### UWB Distance Decoding Functions
