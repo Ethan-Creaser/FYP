@@ -9,7 +9,6 @@ https://github.com/armanghobadi/ulora/
 """
 
 import gc
-import machine
 from machine import SPI, Pin
 from utime import ticks_ms, sleep_ms  # ticks_ms and sleep_ms imported from utime
 from micropython import const
@@ -153,7 +152,7 @@ class ULoRa:
         print("SX127x Version: {}".format(version))
         if version != 0x12:  # Expected version is 0x12 (18 in decimal)
             print("Bad LoRa Connection! Version: {}".format(version))
-            machine.reset()
+            raise RuntimeError("SX127x not found (version={})".format(version))
         else:
             print("LoRa Connection OK! Version: {}".format(version))
         
