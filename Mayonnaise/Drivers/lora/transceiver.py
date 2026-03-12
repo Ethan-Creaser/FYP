@@ -84,10 +84,10 @@ if __name__ == "__main__":
         counter += 1
 
         # Listen for a reply
-        reply = transceiver.receive(timeout=3000)
+        reply = transceiver.receive(timeout=1000)
         if reply:
             print("Got reply: {}".format(reply))
         else:
             print("No reply received.")
 
-        utime.sleep_ms(1000)
+        utime.sleep_ms(500)

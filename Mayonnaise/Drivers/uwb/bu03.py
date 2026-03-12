@@ -6,6 +6,8 @@
 # last updated: 23/02/26
 
 import struct
+
+
 from machine import UART, Pin
 import time
 
@@ -89,3 +91,15 @@ class BU03:
             else:
                 print(f"  BS{i}: Not visible")
         print("-" * 30)
+
+
+if __name__ == "__main__":
+    uwb = BU03()
+    uwb.configure(0, 1, 1, 1)  # ID=0, Role=Base Station, Channel=1, Rate=1
+    while True:
+        distances = uwb.read_distance()
+        if distances:
+            uwb.print_distances(distances)
+        else:
+            print("No distance data received")
+        time.sleep(2)
