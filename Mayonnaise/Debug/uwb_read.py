@@ -1,6 +1,6 @@
 from Drivers.uwb.bu03 import BU03
 
-uwb = BU03()
+uwb = BU03(uart_id=1, tx=17, rx=18)
 
 try:
     while True:

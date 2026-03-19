@@ -12,8 +12,33 @@ from machine import UART, Pin
 import time
 
 class BU03:
-    def __init__(self, uart_id=1, tx=17, rx=18):
+    def __init__(self, uart_id=1, tx=17, rx=18,
+                 config_uart_id=2, config_tx=2, config_rx=1,
+                 reset_pin=15):
         self.uart = UART(uart_id, baudrate=115200, tx=tx, rx=rx)
+        self.config_uart = UART(config_uart_id, baudrate=115200, tx=config_tx, rx=config_rx)
+        self.reset_pin = Pin(reset_pin, Pin.OUT)
+        self.reset_pin.value(1)
+
+    def reconfigure(self, id, role, channel=1, rate=1):
+        """
+        Configure the UWB module over the config UART pins, then reset and
+        switch back to the data UART pins ready for distance reads.
+        """
+        data_uart = self.uart
+        self.uart = self.config_uart
+        try:
+            self.configure(id, role, channel, rate)
+        finally:
+            self.uart = data_uart
+
+        self.reset()
+
+    def reset(self,sleep = 500):
+        self.reset_pin.value(0)
+        time.sleep_ms(sleep)
+        self.reset_pin.value(1)
+        time.sleep_ms(sleep *2)  # wait for module to boot on data UART
 
     def send_at(self, cmd):
         self.uart.write(cmd + '\r\n')
