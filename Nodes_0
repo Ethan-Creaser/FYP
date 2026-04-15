@@ -1,0 +1,524 @@
+"""
+main_node0_gateway.py — Node 0 : Gateway + Relay Coordinator
+=============================================================
+Upload as main.py to the board with config.json {"id": 0}
+
+BU03 UART (confirmed working pinout):
+  AT commands : UART1  tx=2,  rx=1
+  Data stream : UART2  tx=18, rx=17
+  Reset pin   : GPIO15
+
+Frame format (37 bytes):
+  [0:3]  header \xaa\x25\x01
+  [3:35] 8 x uint32 LE distances in mm (slot 1 = closest anchor)
+  [35]   checksum
+  [36]   0x55 footer
+
+LoRa: NSS=10, SCK=12, MOSI=11, MISO=13, RESET=4, DIO0=5
+OLED: SDA=8, SCL=9
+"""
+
+import ujson, utime, struct, gc
+from machine import reset as hard_reset
+from machine import Pin, SPI, UART
+from Drivers.lora.transceiver import LoRaTransceiver
+from Drivers.oled.oled_class  import OLED
+
+# ── Pins ─────────────────────────────────────────────────────────────────────
+PIN_LORA_NSS, PIN_LORA_SCK    = 10, 12
+PIN_LORA_MOSI, PIN_LORA_MISO  = 11, 13
+PIN_LORA_RESET, PIN_LORA_DIO0 = 4,  5
+PIN_UWB_AT_TX,  PIN_UWB_AT_RX = 2,  1
+PIN_UWB_DAT_TX, PIN_UWB_DAT_RX= 18, 17
+PIN_UWB_RESET                  = 15
+PIN_I2C_SDA,    PIN_I2C_SCL   = 8,  9
+
+# ── Timing ───────────────────────────────────────────────────────────────────
+LORA_PING_WAIT_MS      = 2_000
+BECOME_TAG_RETRIES     = 3
+BECOME_TAG_INTERVAL_MS = 2_000
+MAP_WAIT_MS            = 120_000
+MAP_REBROADCAST_MS     = 15_000
+HEARTBEAT_INTERVAL_MS  = 10_000  # ping anchors this often
+HEARTBEAT_TIMEOUT_MS   = 35_000  # mark offline after this with no response
+HEARTBEAT_RETRIES      = 3       # BECOME_TAG retries for re-localisation
+OLED_REFRESH_MS        = 1_000
+UWB_SCAN_FRAMES        = 20
+UWB_FRAME_TIMEOUT_MS   = 1_500
+BU03_RESET_HOLD_MS     = 500
+BU03_BOOT_MS           = 4_000
+UWB_HEADER             = b'\xaa\x25\x01'
+UWB_FRAME_LEN          = 37
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def load_config():
+    d = {"name":"node0","id":0,"channel":1,"rate":1}
+    try:
+        with open("config.json") as f: d.update(ujson.load(f))
+    except Exception as e: print("[CONFIG]",e)
+    return d
+
+def decode_msg(raw):
+    try:
+        if isinstance(raw,(bytes,bytearray)): raw=raw.decode()
+        return ujson.loads(raw)
+    except: return None
+
+def emit(obj): print(ujson.dumps(obj))
+
+# ── BU03 ─────────────────────────────────────────────────────────────────────
+class BU03:
+    def __init__(self):
+        self._rst = Pin(PIN_UWB_RESET, Pin.OUT, value=1)
+        self._buf = bytearray()
+        self._init_uarts()
+        utime.sleep_ms(500)
+
+    def _init_uarts(self):
+        self.at   = UART(1, baudrate=115200, tx=PIN_UWB_AT_TX,
+                         rx=PIN_UWB_AT_RX,  timeout=10)
+        self.data = UART(2, baudrate=115200, tx=PIN_UWB_DAT_TX,
+                         rx=PIN_UWB_DAT_RX, timeout=10)
+
+    def _reset(self):
+        self._rst.value(0)
+        utime.sleep_ms(BU03_RESET_HOLD_MS)
+        self._rst.value(1)
+        utime.sleep_ms(BU03_BOOT_MS)
+        self._init_uarts()
+        utime.sleep_ms(200)
+        self._buf = bytearray()
+
+    def configure(self, node_id, role, ch=1, rate=1):
+        cmd = "AT+SETCFG={},{},{},{}\r\n".format(node_id, role, ch, rate)
+        print("[BU03] Sending:", cmd.strip())
+        self.at.write(cmd)
+        utime.sleep_ms(1000)
+        print("[BU03] SETCFG resp:", self.at.read())
+        self.at.write("AT+SAVE\r\n")
+        utime.sleep_ms(1000)
+        print("[BU03] SAVE resp:", self.at.read())
+        print("[BU03] Hardware reset...")
+        self._reset()
+        print("[BU03] Ready role={} id={}".format(role, node_id))
+
+    def read_frame(self, timeout_ms=UWB_FRAME_TIMEOUT_MS):
+        deadline = utime.ticks_add(utime.ticks_ms(), timeout_ms)
+        while utime.ticks_diff(deadline, utime.ticks_ms()) > 0:
+            if self.data.any():
+                chunk = self.data.read()
+                if chunk: self._buf += chunk
+
+            while len(self._buf) >= 3 and self._buf[0:3] != UWB_HEADER:
+                self._buf = self._buf[1:]
+
+            if len(self._buf) < UWB_FRAME_LEN:
+                utime.sleep_ms(10)
+                continue
+
+            next_hdr = None
+            for k in range(3, len(self._buf) - 2):
+                if self._buf[k:k+3] == UWB_HEADER:
+                    next_hdr = k
+                    break
+
+            if next_hdr is not None:
+                frame_end = next_hdr
+            elif self._buf[UWB_FRAME_LEN-1] == 0x55:
+                frame_end = UWB_FRAME_LEN
+            else:
+                utime.sleep_ms(10)
+                continue
+
+            frame = bytes(self._buf[:frame_end])
+            self._buf = self._buf[frame_end:]
+
+            if len(frame) < 35:
+                continue
+
+            out = []
+            for i in range(8):
+                offset = 3 + i * 4
+                if offset + 4 > len(frame):
+                    out.append(None)
+                    continue
+                raw = struct.unpack('<I', frame[offset:offset+4])[0]
+                out.append(float(raw) / 1000.0 if raw > 0 else None)
+            return out
+
+        return None
+
+    def scan(self, n=UWB_SCAN_FRAMES):
+        best = {}; good = 0; attempts = 0; max_attempts = n * 4
+        while good < n and attempts < max_attempts:
+            attempts += 1
+            f = self.read_frame()
+            if f is None:
+                print("[BU03] timeout {}/{} buf={}b".format(
+                    attempts, max_attempts, len(self._buf)))
+                continue
+            good += 1
+            for idx, d in enumerate(f):
+                if d and d > 0 and (idx not in best or d < best[idx]):
+                    best[idx] = d
+        print("[BU03] scan done: {}/{} good frames".format(good, n))
+        if good == 0:
+            print("[BU03] ZERO good frames — hard resetting board")
+            utime.sleep_ms(500)
+            hard_reset()
+        return best
+
+    def scan_distances(self, n=UWB_SCAN_FRAMES):
+        raw = self.scan(n)
+        return sorted([d for d in raw.values() if d and d > 0])
+
+
+# ── Gateway ───────────────────────────────────────────────────────────────────
+class GatewayNode:
+    def __init__(self, cfg, radio, uwb, oled):
+        self.node_id     = int(cfg.get("id", 0))
+        self.radio       = radio
+        self.uwb         = uwb
+        self.oled        = oled
+        self.node_map    = {}
+        self._dist_list  = []
+        self.known_nodes = set()
+        self.localized   = set()
+        self._last_oled  = 0
+        self._last_self  = 0
+        self._last_hb    = 0   # last heartbeat broadcast time
+        self._last_seen  = {}  # nid → ticks_ms of last PONG/MAP heard
+        self._phase      = "TAG_SCAN"
+
+    def run(self):
+        print("[Node 0] Gateway started")
+        emit({"type":"MAP","id":0,"x":0.0,"y":0.0,"z":0.0,"rssi":0,"snr":0.0})
+        self._oled("GATEWAY\nTAG_SCAN")
+
+        # ── Phase 1: tag scan ─────────────────────────────────────────────
+        self.uwb.configure(0, role=0)
+
+        print("[Node 0] Waiting for anchors (ping every {}ms)...".format(LORA_PING_WAIT_MS))
+        self._oled("TAG_SCAN\nWaiting...")
+        last_ping = utime.ticks_add(utime.ticks_ms(), -LORA_PING_WAIT_MS)
+        _ping_start = utime.ticks_ms()
+        while not self.known_nodes:
+            now = utime.ticks_ms()
+            if utime.ticks_diff(now, last_ping) >= LORA_PING_WAIT_MS:
+                print("[Node 0] Sending PING...")
+                self._lora_send({"type":"PING","id":0})
+                last_ping = utime.ticks_ms()
+            msg = self._lora_recv()
+            if msg and msg.get("type") == "PONG":
+                nid = msg.get("id")
+                if nid and nid != 0:
+                    self.known_nodes.add(nid)
+                    print("[Node 0] Heard anchor {}".format(nid))
+            # Hard reset if no anchor found after 3 minutes
+            if utime.ticks_diff(utime.ticks_ms(), _ping_start) > 180_000:
+                print("[Node 0] No anchors after 3min — hard resetting")
+                utime.sleep_ms(500)
+                hard_reset()
+            utime.sleep_ms(50)
+
+        print("[Node 0] Collecting others for {}ms...".format(LORA_PING_WAIT_MS))
+        self._oled("TAG_SCAN\nCollecting...")
+        drain = utime.ticks_add(utime.ticks_ms(), LORA_PING_WAIT_MS)
+        while utime.ticks_diff(drain, utime.ticks_ms()) > 0:
+            msg = self._lora_recv()
+            if msg and msg.get("type") == "PONG":
+                nid = msg.get("id")
+                if nid and nid != 0 and nid not in self.known_nodes:
+                    self.known_nodes.add(nid)
+                    print("[Node 0] Heard anchor {}".format(nid))
+            utime.sleep_ms(50)
+
+        # UWB scan
+        print("[Node 0] Settling 3s before UWB scan...")
+        self._oled("TAG_SCAN\nUWB settle...")
+        utime.sleep_ms(3000)
+        if self.uwb.data.any(): self.uwb.data.read()
+        self.uwb._buf = bytearray()
+
+        while True:
+            print("[Node 0] Scanning UWB...")
+            self._oled("TAG_SCAN\nUWB scan...")
+            self._dist_list = self.uwb.scan_distances(UWB_SCAN_FRAMES)
+            if self._dist_list:
+                break
+            print("[Node 0] UWB empty — retrying...")
+            self._oled("TAG_SCAN\nUWB retry...")
+            self._lora_send({"type":"PING","id":0})
+            drain = utime.ticks_add(utime.ticks_ms(), 3000)
+            while utime.ticks_diff(drain, utime.ticks_ms()) > 0:
+                msg = self._lora_recv()
+                if msg and msg.get("type") == "PONG":
+                    nid = msg.get("id")
+                    if nid and nid != 0 and nid not in self.known_nodes:
+                        self.known_nodes.add(nid)
+                        print("[Node 0] New anchor {}".format(nid))
+                utime.sleep_ms(50)
+            if self.uwb.data.any(): self.uwb.data.read()
+            self.uwb._buf = bytearray()
+
+        print("[Node 0] UWB distances:", self._dist_list)
+        print("[Node 0] Known nodes:", self.known_nodes)
+
+        self.uwb.configure(0, role=1)
+
+        now = utime.ticks_ms()
+        self.node_map[0] = {"x":0.0,"y":0.0,"z":0.0,"rssi":0,"snr":0.0,"last_seen":now}
+        self.localized.add(0)
+        emit({"type":"MAP","id":0,"x":0.0,"y":0.0,"z":0.0,"rssi":0,"snr":0.0})
+
+        # Second ping after becoming anchor
+        self._lora_send({"type":"PING","id":0})
+        drain = utime.ticks_add(utime.ticks_ms(), 3000)
+        while utime.ticks_diff(drain, utime.ticks_ms()) > 0:
+            msg = self._lora_recv()
+            if msg and msg.get("type") == "PONG":
+                nid = msg.get("id")
+                if nid and nid != 0 and nid not in self.known_nodes:
+                    self.known_nodes.add(nid)
+                    print("[Node 0] Late anchor {}".format(nid))
+            utime.sleep_ms(50)
+        print("[Node 0] Final known nodes:", self.known_nodes)
+
+        # Collect MAPs from any nodes that are already localised
+        # (e.g. Node 0 crashed and restarted, others kept their positions)
+        print("[Node 0] Requesting existing positions...")
+        self._lora_send({"type":"REQUEST_MAP","id":0})
+        collect = utime.ticks_add(utime.ticks_ms(), 8000)
+        while utime.ticks_diff(collect, utime.ticks_ms()) > 0:
+            msg = self._lora_recv()
+            if msg and msg.get("type") == "MAP":
+                nid = msg.get("id")
+                if nid and nid != 0:
+                    self._record_map(msg)
+                    print("[Node 0] Pre-existing position: node {} at ({},{},{})".format(
+                        nid, msg.get("x"), msg.get("y"), msg.get("z")))
+            utime.sleep_ms(50)
+        print("[Node 0] Already localised:", self.localized)
+
+        # ── Phase 2: relay ────────────────────────────────────────────────
+        self._phase = "RELAY"
+        while True:
+            target = self._next_target()
+            if target is None:
+                print("[Node 0] All nodes localized")
+                break
+
+            print("[Node 0] Relay → node {}".format(target))
+            self._oled("RELAY\nTarget:{}".format(target))
+
+            # Broadcast all known positions before BECOME_TAG
+            self._respond_map_request()
+
+            for _ in range(BECOME_TAG_RETRIES):
+                self._lora_send({"type":"BECOME_TAG","id":target})
+                utime.sleep_ms(BECOME_TAG_INTERVAL_MS)
+
+            deadline = utime.ticks_add(utime.ticks_ms(), MAP_WAIT_MS)
+            got_it = False
+            while utime.ticks_diff(deadline, utime.ticks_ms()) > 0:
+                msg = self._lora_recv()
+                if msg:
+                    t = msg.get("type"); nid = msg.get("id")
+                    if nid and nid != 0 and t in ("PONG","MAP"):
+                        if nid not in self.known_nodes:
+                            self.known_nodes.add(nid)
+                            print("[Node 0] Discovered node {}".format(nid))
+                    if t == "MAP" and nid and nid != 0:
+                        self._record_map(msg)
+                        if nid == target:
+                            got_it = True
+                            break
+                    elif t == "REQUEST_MAP":
+                        self._respond_map_request()
+                self._periodic_oled()
+                utime.sleep_ms(50)
+
+            if got_it:
+                print("[Node 0] Node {} localized OK".format(target))
+                print("[Node 0] Waiting 6s for re-anchor...")
+                utime.sleep_ms(6000)
+            else:
+                print("[Node 0] Node {} timed out — skipping".format(target))
+                self.localized.add(target)
+
+            self._emit_self()
+            gc.collect()
+
+        # ── Phase 3: steady state ─────────────────────────────────────────
+        # Each node re-ranges itself independently on its own timer.
+        # Node 0 just listens for updated MAPs, handles NEED_TAG for
+        # unlocalized nodes, and forwards everything to the laptop.
+        self._phase = "STEADY"
+        self._lora_send({"type":"PING","id":0})
+        while True:
+            now = utime.ticks_ms()
+            msg = self._lora_recv()
+            if msg:
+                t = msg.get("type"); nid = msg.get("id")
+                if nid and nid != 0 and t in ("PONG","MAP","NEED_TAG"):
+                    if nid not in self.known_nodes:
+                        self.known_nodes.add(nid)
+                    self._last_seen[nid] = utime.ticks_ms()
+                if t == "MAP" and nid and nid != 0:
+                    self._record_map(msg)
+                elif t == "REQUEST_MAP":
+                    self._respond_map_request()
+                elif t == "NEED_TAG" and nid and nid != 0:
+                    # Unlocalized node needs help — send it positions and BECOME_TAG
+                    print("[Node 0] Node {} needs localisation".format(nid))
+                    self.localized.discard(nid)
+                    self._respond_map_request()
+                    self._lora_send({"type":"BECOME_TAG","id":nid})
+                    # Wait for its MAP
+                    deadline = utime.ticks_add(utime.ticks_ms(), MAP_WAIT_MS)
+                    while utime.ticks_diff(deadline, utime.ticks_ms()) > 0:
+                        m2 = self._lora_recv()
+                        if m2:
+                            t2 = m2.get("type"); n2 = m2.get("id")
+                            if t2 == "MAP" and n2 and n2 != 0:
+                                self._record_map(m2)
+                                if n2 == nid:
+                                    break
+                            elif t2 == "REQUEST_MAP":
+                                self._respond_map_request()
+                        utime.sleep_ms(50)
+                    utime.sleep_ms(4000)  # let it finish re-anchoring
+
+            if utime.ticks_diff(now, self._last_self) >= MAP_REBROADCAST_MS:
+                self._emit_self()
+                self._last_self = utime.ticks_ms()
+            if utime.ticks_diff(now, self._last_hb) >= HEARTBEAT_INTERVAL_MS:
+                self._do_heartbeat()
+                self._last_hb = utime.ticks_ms()
+            self._periodic_oled()
+            gc.collect()
+            utime.sleep_ms(50)
+
+    def _do_heartbeat(self):
+        """
+        Broadcast a HEARTBEAT ping. Any localised node that hasn't
+        responded within HEARTBEAT_TIMEOUT_MS is considered offline
+        and removed from localized so it gets re-assigned on return.
+        """
+        anchors = [n for n in self.localized if n != 0]
+        if not anchors:
+            return
+        self._lora_send({"type":"HEARTBEAT","id":0})
+        now = utime.ticks_ms()
+        for nid in anchors:
+            last = self._last_seen.get(nid)
+            if last is None:
+                # Never heard from — set baseline so we don't immediately drop
+                self._last_seen[nid] = now
+                continue
+            age = utime.ticks_diff(now, last)
+            if age > HEARTBEAT_TIMEOUT_MS:
+                print("[Node 0] Node {} offline ({}ms silent) — will re-localise on return".format(
+                    nid, age))
+                self.localized.discard(nid)
+                if nid in self.node_map:
+                    del self.node_map[nid]
+                del self._last_seen[nid]
+                # Notify laptop the node is gone
+                emit({"type":"OFFLINE","id":nid})
+
+    def _respond_map_request(self):
+        """Send all known positions to any node that requests them."""
+        self._lora_send({"type":"MAP","id":0,"x":0.0,"y":0.0,"z":0.0})
+        for mnid, me in self.node_map.items():
+            if mnid != 0:
+                self._lora_send({"type":"MAP","id":mnid,
+                    "x":round(me["x"],4),
+                    "y":round(me["y"],4),
+                    "z":round(me["z"],4)})
+
+    def _next_target(self):
+        candidates = [n for n in self.known_nodes if n not in self.localized]
+        if not candidates: return None
+        candidates.sort()
+        return candidates[0]
+
+    def _record_map(self, msg):
+        nid  = msg.get("id")
+        rssi = self.radio.lora.packet_rssi()
+        snr  = self.radio.lora.packet_snr()
+        e = {"x":float(msg.get("x",0)),"y":float(msg.get("y",0)),
+             "z":float(msg.get("z",0)),"rssi":rssi,
+             "snr":round(snr,2),"last_seen":utime.ticks_ms()}
+        self.node_map[nid] = e
+        self.localized.add(nid)
+        self._last_seen[nid] = utime.ticks_ms()
+        emit({"type":"MAP","id":nid,
+              "x":round(e["x"],4),"y":round(e["y"],4),"z":round(e["z"],4),
+              "rssi":rssi,"snr":round(snr,2)})
+
+    def _lora_send(self, obj):
+        self.radio.send(ujson.dumps(obj).encode())
+
+    def _lora_recv(self):
+        raw = self.radio.lora.listen(timeout=50)
+        if raw:
+            msg = decode_msg(raw)
+            if msg is None:
+                print("[Node 0] RAW rx (decode failed):", raw)
+            return msg
+        return None
+
+    def _emit_self(self):
+        self._last_self = utime.ticks_ms()
+        emit({"type":"MAP","id":0,"x":0.0,"y":0.0,"z":0.0,"rssi":0,"snr":0.0})
+        self._lora_send({"type":"MAP","id":0,"x":0.0,"y":0.0,"z":0.0})
+
+    def _periodic_oled(self):
+        now = utime.ticks_ms()
+        if utime.ticks_diff(now, self._last_oled) >= OLED_REFRESH_MS:
+            self._oled("GATEWAY\n{}\nNodes:{}".format(self._phase, len(self.node_map)))
+            self._last_oled = utime.ticks_ms()
+
+    def _oled(self, text):
+        if not self.oled: return
+        try: self.oled.display_text(text)
+        except: pass
+
+
+# ── Init ──────────────────────────────────────────────────────────────────────
+def init_lora():
+    try:
+        spi = SPI(1, baudrate=5_000_000, polarity=0, phase=0,
+                  sck=Pin(PIN_LORA_SCK), mosi=Pin(PIN_LORA_MOSI),
+                  miso=Pin(PIN_LORA_MISO))
+        r = LoRaTransceiver(spi=spi, pins={
+            "ss": PIN_LORA_NSS, "reset": PIN_LORA_RESET, "dio0": PIN_LORA_DIO0})
+        print("[INIT] LoRa OK")
+        return r
+    except Exception as e:
+        print("[INIT] LoRa FAILED:", e)
+        return None
+
+def init_oled():
+    try:
+        o = OLED(sda=PIN_I2C_SDA, scl=PIN_I2C_SCL)
+        o.display_text("Gateway\nBooting...")
+        print("[INIT] OLED OK")
+        return o
+    except Exception as e:
+        print("[INIT] OLED FAILED:", e)
+        return None
+
+def main():
+    cfg = load_config()
+    assert int(cfg.get("id",-1)) == 0, "This file is for Node 0 only!"
+    oled  = init_oled()
+    radio = init_lora()
+    if radio is None:
+        if oled: oled.display_text("LoRa FAIL\nHalted")
+        print("[FATAL] LoRa required. Halting.")
+        return
+    GatewayNode(cfg, radio, BU03(), oled).run()
+
+main()
