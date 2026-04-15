@@ -1,0 +1,572 @@
+"""
+main_all.py — Follower Node (IDs 1 … N)
+=========================================
+Upload as main.py to every non-gateway board.
+Set config.json {"id": <unique_integer >= 1>}
+
+Positioning:
+  1 anchor  → placed on X axis at distance d from anchor
+  2 anchors → circle intersection, y >= 0
+  3+        → trilateration / least-squares
+"""
+
+import ujson, utime, struct, math, gc
+from machine import reset as hard_reset
+from machine import Pin, SPI, UART
+from Drivers.lora.transceiver import LoRaTransceiver
+from Drivers.oled.oled_class  import OLED
+
+# ── Pins ─────────────────────────────────────────────────────────────────────
+PIN_LORA_NSS, PIN_LORA_SCK    = 10, 12
+PIN_LORA_MOSI, PIN_LORA_MISO  = 11, 13
+PIN_LORA_RESET, PIN_LORA_DIO0 = 4,  5
+PIN_UWB_AT_TX,  PIN_UWB_AT_RX = 2,  1
+PIN_UWB_DAT_TX, PIN_UWB_DAT_RX= 18, 17
+PIN_UWB_RESET                  = 15
+PIN_I2C_SDA,    PIN_I2C_SCL   = 8,  9
+
+# ── Timing ───────────────────────────────────────────────────────────────────
+MAP_BROADCAST_MS     = 15_000
+RANGE_CHECK_MS       = 15_000  # how often to check if position changed
+MOVE_THRESHOLD_M     = 0.15    # metres — re-localise if moved more than this
+PONG_INTERVAL_MS     = 3_000
+OLED_REFRESH_MS      = 1_000
+UWB_SCAN_FRAMES      = 20
+UWB_FRAME_TIMEOUT_MS = 1_500
+BU03_RESET_HOLD_MS   = 500
+BU03_BOOT_MS         = 4_000   # cold boot
+BU03_BOOT_MS_WARM    = 2_000   # warm restart (already running)
+ANCHOR_SETTLE_MS     = 3_000
+UWB_HEADER           = b'\xaa\x25\x01'
+UWB_FRAME_LEN        = 37
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def load_config():
+    d = {"name":"node","id":1,"channel":1,"rate":1}
+    try:
+        with open("config.json") as f: d.update(ujson.load(f))
+    except Exception as e: print("[CONFIG]",e)
+    return d
+
+def encode_msg(obj): return ujson.dumps(obj).encode()
+
+def decode_msg(raw):
+    try:
+        if isinstance(raw,(bytes,bytearray)): raw=raw.decode()
+        return ujson.loads(raw)
+    except: return None
+
+# ── BU03 ─────────────────────────────────────────────────────────────────────
+class BU03:
+    def __init__(self):
+        self._rst = Pin(PIN_UWB_RESET, Pin.OUT, value=1)
+        self._buf = bytearray()
+        self._init_uarts()
+        utime.sleep_ms(500)
+
+    def _init_uarts(self):
+        self.at   = UART(1, baudrate=115200, tx=PIN_UWB_AT_TX,
+                         rx=PIN_UWB_AT_RX,  timeout=10)
+        self.data = UART(2, baudrate=115200, tx=PIN_UWB_DAT_TX,
+                         rx=PIN_UWB_DAT_RX, timeout=10)
+
+    def _reset(self):
+        self._rst.value(0)
+        utime.sleep_ms(BU03_RESET_HOLD_MS)
+        self._rst.value(1)
+        utime.sleep_ms(BU03_BOOT_MS)
+        self._init_uarts()
+        utime.sleep_ms(200)
+        self._buf = bytearray()
+
+    def configure_warm(self, node_id, role, ch=1, rate=1):
+        """Faster role switch for warm restarts — shorter boot wait."""
+        cmd = "AT+SETCFG={},{},{},{}\r\n".format(node_id, role, ch, rate)
+        print("[BU03] Warm cfg:", cmd.strip())
+        self.at.write(cmd)
+        utime.sleep_ms(1000)
+        self.at.read()  # discard response
+        self.at.write("AT+SAVE\r\n")
+        utime.sleep_ms(1000)
+        self.at.read()
+        self._rst.value(0)
+        utime.sleep_ms(BU03_RESET_HOLD_MS)
+        self._rst.value(1)
+        utime.sleep_ms(BU03_BOOT_MS_WARM)  # shorter wait
+        self._init_uarts()
+        utime.sleep_ms(200)
+        self._buf = bytearray()
+        print("[BU03] Warm ready role={} id={}".format(role, node_id))
+
+    def configure(self, node_id, role, ch=1, rate=1):
+        cmd = "AT+SETCFG={},{},{},{}\r\n".format(node_id, role, ch, rate)
+        print("[BU03] Sending:", cmd.strip())
+        self.at.write(cmd)
+        utime.sleep_ms(1000)
+        print("[BU03] SETCFG resp:", self.at.read())
+        self.at.write("AT+SAVE\r\n")
+        utime.sleep_ms(1000)
+        print("[BU03] SAVE resp:", self.at.read())
+        print("[BU03] Hardware reset...")
+        self._reset()
+        print("[BU03] Ready role={} id={}".format(role, node_id))
+
+    def read_frame(self, timeout_ms=UWB_FRAME_TIMEOUT_MS):
+        deadline = utime.ticks_add(utime.ticks_ms(), timeout_ms)
+        while utime.ticks_diff(deadline, utime.ticks_ms()) > 0:
+            if self.data.any():
+                chunk = self.data.read()
+                if chunk: self._buf += chunk
+
+            while len(self._buf) >= 3 and self._buf[0:3] != UWB_HEADER:
+                self._buf = self._buf[1:]
+
+            if len(self._buf) < UWB_FRAME_LEN:
+                utime.sleep_ms(10)
+                continue
+
+            next_hdr = None
+            for k in range(3, len(self._buf) - 2):
+                if self._buf[k:k+3] == UWB_HEADER:
+                    next_hdr = k
+                    break
+
+            if next_hdr is not None:
+                frame_end = next_hdr
+            elif self._buf[UWB_FRAME_LEN-1] == 0x55:
+                frame_end = UWB_FRAME_LEN
+            else:
+                utime.sleep_ms(10)
+                continue
+
+            frame = bytes(self._buf[:frame_end])
+            self._buf = self._buf[frame_end:]
+
+            if len(frame) < 35:
+                continue
+
+            out = []
+            for i in range(8):
+                offset = 3 + i * 4
+                if offset + 4 > len(frame):
+                    out.append(None)
+                    continue
+                raw = struct.unpack('<I', frame[offset:offset+4])[0]
+                out.append(float(raw) / 1000.0 if raw > 0 else None)
+            return out
+
+        return None
+
+    def scan(self, n=UWB_SCAN_FRAMES):
+        best = {}; good = 0; attempts = 0; max_attempts = n * 4
+        while good < n and attempts < max_attempts:
+            attempts += 1
+            f = self.read_frame()
+            if f is None:
+                print("[BU03] timeout {}/{} buf={}b".format(
+                    attempts, max_attempts, len(self._buf)))
+                continue
+            good += 1
+            for idx, d in enumerate(f):
+                if d and d > 0 and (idx not in best or d < best[idx]):
+                    best[idx] = d
+        print("[BU03] scan done: {}/{} good frames".format(good, n))
+        # Hard reset if we got almost no frames — something is badly wrong
+        if good == 0:
+            print("[BU03] ZERO good frames — hard resetting board")
+            utime.sleep_ms(500)
+            hard_reset()
+        return best
+
+
+# ── Geometry ──────────────────────────────────────────────────────────────────
+def _circle_intersect(p0, d0, p1, d1):
+    x1,y1=p0[0],p0[1]; x2,y2=p1[0],p1[1]
+    dx,dy=x2-x1,y2-y1
+    D=math.sqrt(dx*dx+dy*dy)
+    if D<1e-6: return None
+    d0=min(d0,D+d1-1e-6); d1=min(d1,D+d0-1e-6)
+    d0=max(d0,abs(D-d1)+1e-6)
+    a=(d0*d0-d1*d1+D*D)/(2*D)
+    h2=d0*d0-a*a
+    if h2<0: h2=0.0
+    h=math.sqrt(h2)
+    mx=x1+a*dx/D; my=y1+a*dy/D
+    px1=mx+h*dy/D; py1=my-h*dx/D
+    px2=mx-h*dy/D; py2=my+h*dx/D
+    return (px2,py2) if py2>=py1 else (px1,py1)
+
+def _trilaterate_2d(p1,d1,p2,d2,p3,d3):
+    x1,y1=p1; x2,y2=p2; x3,y3=p3
+    A=2*(x2-x1); B=2*(y2-y1)
+    C=d1*d1-d2*d2-x1*x1+x2*x2-y1*y1+y2*y2
+    D=2*(x3-x1); E=2*(y3-y1)
+    F=d1*d1-d3*d3-x1*x1+x3*x3-y1*y1+y3*y3
+    denom=A*E-B*D
+    if abs(denom)<1e-6: return None
+    return ((C*E-F*B)/denom,(A*F-D*C)/denom)
+
+def solve_position(measurements):
+    measurements=sorted(measurements,key=lambda m:m[1])
+    n=len(measurements)
+    if n==0: return None
+    if n==1:
+        (p,d)=measurements[0]
+        print("[SOLVE] 1 anchor → X-axis at {:.3f}m".format(d))
+        return (p[0]+d,p[1],0.0)
+    if n==2:
+        (p0,d0),(p1,d1)=measurements
+        r=_circle_intersect((p0[0],p0[1]),d0,(p1[0],p1[1]),d1)
+        if r is None: return (p0[0]+d0,p0[1],0.0)
+        print("[SOLVE] 2 anchors → ({:.3f},{:.3f})".format(r[0],r[1]))
+        return (r[0],r[1],0.0)
+    if n==3:
+        (p1,d1),(p2,d2),(p3,d3)=measurements[:3]
+        r=_trilaterate_2d((p1[0],p1[1]),d1,(p2[0],p2[1]),d2,(p3[0],p3[1]),d3)
+        if r is None: return solve_position(measurements[:2])
+        print("[SOLVE] 3 anchors → ({:.3f},{:.3f})".format(r[0],r[1]))
+        return (r[0],r[1],0.0)
+    (p0,d0)=measurements[0]; x0,y0,z0=p0
+    A_rows,b_rows=[],[]
+    for (pi,di) in measurements[1:]:
+        xi,yi,zi=pi
+        A_rows.append([2*(xi-x0),2*(yi-y0),2*(zi-z0)])
+        b_rows.append(d0*d0-di*di-x0*x0+xi*xi-y0*y0+yi*yi-z0*z0+zi*zi)
+    AtA=[[0.0]*3 for _ in range(3)]; Atb=[0.0]*3
+    for row,b in zip(A_rows,b_rows):
+        for i in range(3):
+            Atb[i]+=row[i]*b
+            for j in range(3): AtA[i][j]+=row[i]*row[j]
+    def det3(m):
+        return(m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1])
+              -m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0])
+              +m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]))
+    def repl(m,ci,v):
+        r=[row[:] for row in m]
+        for i in range(3): r[i][ci]=v[i]
+        return r
+    D=det3(AtA)
+    if abs(D)<1e-9: return solve_position(measurements[:3])
+    x=det3(repl(AtA,0,Atb))/D
+    y=det3(repl(AtA,1,Atb))/D
+    z=det3(repl(AtA,2,Atb))/D
+    print("[SOLVE] {}+ anchors → ({:.3f},{:.3f},{:.3f})".format(n,x,y,z))
+    return (x,y,z)
+
+
+# ── Follower ──────────────────────────────────────────────────────────────────
+class FollowerNode:
+    def __init__(self, cfg, radio, uwb, oled):
+        self.node_id       = int(cfg.get("id", 1))
+        self.radio         = radio
+        self.uwb           = uwb
+        self.oled          = oled
+        self.coords        = None
+        self.known_anchors = {}
+        self._last_map     = 0
+        self._last_oled    = 0
+        self._last_pong    = 0
+        self._last_check   = 0  # last time position was checked
+
+    def run(self):
+        print("[Node {}] Follower started — booting as anchor".format(self.node_id))
+        self._oled("ID:{}\nBooting...".format(self.node_id))
+        self.uwb.configure(self.node_id, role=1)
+        self._oled("ID:{}\nWaiting...".format(self.node_id))
+        print("[Node {}] Anchor ready. Waiting for BECOME_TAG.".format(self.node_id))
+        _boot_time = utime.ticks_ms()
+        _last_need_tag = utime.ticks_add(utime.ticks_ms(), -20_000)  # send after 10s
+
+        while True:
+            now = utime.ticks_ms()
+
+            msg = self._lora_recv()
+            if msg: self._handle(msg)
+
+            # Proactive PONG so Node 0 discovers us regardless of boot order
+            if utime.ticks_diff(now, self._last_pong) >= PONG_INTERVAL_MS:
+                self._send_pong()
+                self._last_pong = utime.ticks_ms()
+
+            # Continuously request localisation if we have no position
+            # Send NEED_TAG every 15s after an initial 10s boot delay
+            if (not self.coords and
+                    utime.ticks_diff(now, _boot_time) >= 10_000 and
+                    utime.ticks_diff(now, _last_need_tag) >= 15_000):
+                print("[Node {}] No position — requesting localisation".format(self.node_id))
+                self._lora_send({"type":"NEED_TAG","id":self.node_id})
+                _last_need_tag = utime.ticks_ms()
+
+            if self.coords and utime.ticks_diff(now, self._last_map) >= MAP_BROADCAST_MS:
+                self._broadcast_map()
+                self._last_map = utime.ticks_ms()
+
+            # Periodic position check — quick range reading to detect movement
+            # Only runs full re-localisation if position changed significantly
+            if (self.coords and
+                    utime.ticks_diff(now, self._last_check) >= RANGE_CHECK_MS):
+                self._check_position()
+                self._last_check = utime.ticks_ms()
+
+            if utime.ticks_diff(now, self._last_oled) >= OLED_REFRESH_MS:
+                self._refresh_oled()
+                self._last_oled = utime.ticks_ms()
+
+            gc.collect()
+            utime.sleep_ms(50)
+
+    def _handle(self, msg):
+        t = msg.get("type")
+        if t == "PING":
+            self._send_pong()
+        elif t in ("PONG","MAP"):
+            src = msg.get("id")
+            if src is not None and src != self.node_id:
+                x=float(msg.get("x",0)); y=float(msg.get("y",0)); z=float(msg.get("z",0))
+                # Only store non-zero positions, or authoritative MAP messages
+                if t == "MAP" or (x != 0 or y != 0 or z != 0):
+                    self.known_anchors[src] = (x,y,z)
+                    print("[Node {}] Learned anchor {} at ({:.3f},{:.3f},{:.3f}) via {}".format(
+                        self.node_id, src, x, y, z, t))
+        elif t == "HEARTBEAT":
+            # Gateway is checking we're alive — respond with current position
+            if self.coords:
+                self._broadcast_map()
+            else:
+                self._send_pong()
+        elif t == "REQUEST_MAP":
+            # Gateway restarted and is collecting existing positions
+            if self.coords:
+                print("[Node {}] Responding to REQUEST_MAP".format(self.node_id))
+                self._broadcast_map()
+        elif t == "BECOME_TAG" and msg.get("id") == self.node_id:
+            print("[Node {}] BECOME_TAG received".format(self.node_id))
+            self._localise()
+
+    def _localise(self):
+        self._oled("ID:{}\nBecome TAG".format(self.node_id))
+        try:
+            self._do_localise()
+        except Exception as e:
+            print("[Node {}] Localise error: {}".format(self.node_id, e))
+        finally:
+            print("[Node {}] Restoring anchor mode...".format(self.node_id))
+            # Warm configure is faster for cycling nodes
+            self.uwb.configure_warm(self.node_id, role=1)
+            self._oled("ID:{}\nAnch ready".format(self.node_id))
+
+    def _do_localise(self):
+        # Use faster warm configure if we already have a position
+        if self.coords:
+            self.uwb.configure_warm(self.node_id, role=0)
+        else:
+            self.uwb.configure(self.node_id, role=0)
+
+        # Settle — actively request positions from all known anchors
+        self._oled("ID:{}\nTAG settle".format(self.node_id))
+        # Broadcast REQUEST_MAP so anchors send their positions immediately
+        self._lora_send({"type":"REQUEST_MAP","id":self.node_id})
+        end = utime.ticks_add(utime.ticks_ms(), ANCHOR_SETTLE_MS)
+        last_req = utime.ticks_ms()
+        while utime.ticks_diff(end, utime.ticks_ms()) > 0:
+            msg = self._lora_recv()
+            if msg and msg.get("type") in ("MAP","PONG"):
+                src = msg.get("id"); mt = msg.get("type")
+                if src is not None and src != self.node_id:
+                    x=float(msg.get("x",0)); y=float(msg.get("y",0)); z=float(msg.get("z",0))
+                    if mt == "MAP" or (x != 0 or y != 0 or z != 0):
+                        self.known_anchors[src] = (x,y,z)
+            # Re-request every second in case first was missed
+            if utime.ticks_diff(utime.ticks_ms(), last_req) >= 1000:
+                self._lora_send({"type":"REQUEST_MAP","id":self.node_id})
+                last_req = utime.ticks_ms()
+            utime.sleep_ms(50)
+        print("[Node {}] Known anchors after settle: {}".format(
+            self.node_id, self.known_anchors))
+
+        # Flush then scan
+        utime.sleep_ms(2000)
+        if self.uwb.data.any(): self.uwb.data.read()
+        self.uwb._buf = bytearray()
+
+        self._oled("ID:{}\nRanging...".format(self.node_id))
+        raw_slots = self.uwb.scan(UWB_SCAN_FRAMES)
+        print("[Node {}] UWB raw slots: {}".format(self.node_id, raw_slots))
+
+        slot_dists = sorted([d for d in raw_slots.values() if d and d > 0])
+        print("[Node {}] Distances: {}".format(self.node_id, slot_dists))
+
+        if not slot_dists:
+            print("[Node {}] No UWB distances".format(self.node_id))
+            return
+
+        # Match distances to anchors sorted by proximity to this node
+        ref = (self.coords[0],self.coords[1],self.coords[2]) if self.coords else (0,0,0)
+        def dist_from_ref(pos):
+            return math.sqrt((pos[0]-ref[0])**2+(pos[1]-ref[1])**2+(pos[2]-ref[2])**2)
+        anchors_sorted = sorted(self.known_anchors.items(),
+                                key=lambda kv: dist_from_ref(kv[1]))
+
+        measurements = []
+        for i,(aid,pos) in enumerate(anchors_sorted):
+            if i >= len(slot_dists): break
+            d = slot_dists[i]
+            measurements.append((pos, d))
+            print("[Node {}]   anchor {} pos={} d={:.3f}m".format(
+                self.node_id, aid, pos, d))
+
+        print("[Node {}] {} measurement(s)".format(self.node_id, len(measurements)))
+
+        result = solve_position(measurements)
+        if result is None:
+            print("[Node {}] Could not solve position".format(self.node_id))
+            self._oled("ID:{}\nLOC FAILED".format(self.node_id))
+            return
+
+        x,y,z = result
+        self.coords = (x,y,z)
+        self.known_anchors[self.node_id] = (x,y,z)
+        print("[Node {}] Localized: ({:.3f},{:.3f},{:.3f})".format(self.node_id,x,y,z))
+        self._oled("ID:{} ANCH\n{:.2f},{:.2f},{:.2f}".format(self.node_id,x,y,z))
+
+        # Send MAP multiple times so Node 0 definitely hears it
+        for _ in range(5):
+            self._broadcast_map()
+            utime.sleep_ms(500)
+        self._last_map = utime.ticks_ms()
+
+    def _check_position(self):
+        """
+        Quick check — take a few UWB frames as tag and compare distances
+        to what we expect from our current position. Only re-localise if
+        something has moved significantly.
+        """
+        if not self.coords or not self.known_anchors:
+            return
+        print("[Node {}] Position check...".format(self.node_id))
+
+        # Quick switch to tag — just 5 frames, no full settle
+        try:
+            self.uwb.configure_warm(self.node_id, role=0)
+            utime.sleep_ms(500)
+            if self.uwb.data.any(): self.uwb.data.read()
+            self.uwb._buf = bytearray()
+            # Read just 5 frames for a quick distance snapshot
+            quick_slots = self.uwb.scan(5)
+            quick_dists = sorted([d for d in quick_slots.values() if d and d > 0])
+        except Exception as e:
+            print("[Node {}] Check error: {}".format(self.node_id, e))
+            quick_dists = []
+        finally:
+            self.uwb.configure_warm(self.node_id, role=1)
+
+        if not quick_dists:
+            print("[Node {}] No distances in check".format(self.node_id))
+            return
+
+        # Compare measured distances to expected distances from current position
+        # Expected: distance from self to each known anchor
+        cx, cy, cz = self.coords
+        expected = sorted([
+            math.sqrt((p[0]-cx)**2 + (p[1]-cy)**2 + (p[2]-cz)**2)
+            for p in self.known_anchors.values()
+            if p != (cx, cy, cz)  # exclude self
+        ])
+
+        # Check if any measured distance differs significantly from expected
+        moved = False
+        for i, measured in enumerate(quick_dists):
+            if i >= len(expected):
+                break
+            diff = abs(measured - expected[i])
+            print("[Node {}] Check: measured={:.3f}m expected={:.3f}m diff={:.3f}m".format(
+                self.node_id, measured, expected[i], diff))
+            if diff > MOVE_THRESHOLD_M:
+                moved = True
+                break
+
+        if moved:
+            print("[Node {}] Movement detected — re-localising".format(self.node_id))
+            self._localise()
+        else:
+            print("[Node {}] Position unchanged".format(self.node_id))
+
+    def _send_pong(self):
+        self._lora_send({
+            "type": "PONG", "id": self.node_id,
+            "x": round(self.coords[0],4) if self.coords else 0.0,
+            "y": round(self.coords[1],4) if self.coords else 0.0,
+            "z": round(self.coords[2],4) if self.coords else 0.0,
+        })
+
+    def _broadcast_map(self):
+        if not self.coords: return
+        self._lora_send({
+            "type":"MAP","id":self.node_id,
+            "x":round(self.coords[0],4),
+            "y":round(self.coords[1],4),
+            "z":round(self.coords[2],4),
+        })
+
+    def _lora_send(self, obj):
+        self.radio.send(encode_msg(obj))
+
+    def _lora_recv(self):
+        raw = self.radio.lora.listen(timeout=50)
+        if raw: return decode_msg(raw)
+        return None
+
+    def _refresh_oled(self):
+        if self.coords:
+            x,y,z=self.coords
+            t="ID:{} ANCH\n{:.2f},{:.2f},{:.2f}\nAnch:{}".format(
+                self.node_id,x,y,z,len(self.known_anchors))
+        else:
+            t="ID:{} WAIT\nAnch:{}".format(self.node_id,len(self.known_anchors))
+        self._oled(t)
+
+    def _oled(self, text):
+        if not self.oled: return
+        try: self.oled.display_text(text)
+        except: pass
+
+
+# ── Init ──────────────────────────────────────────────────────────────────────
+def init_lora():
+    try:
+        spi = SPI(1, baudrate=5_000_000, polarity=0, phase=0,
+                  sck=Pin(PIN_LORA_SCK), mosi=Pin(PIN_LORA_MOSI),
+                  miso=Pin(PIN_LORA_MISO))
+        r = LoRaTransceiver(spi=spi, pins={
+            "ss": PIN_LORA_NSS, "reset": PIN_LORA_RESET, "dio0": PIN_LORA_DIO0})
+        print("[INIT] LoRa OK")
+        return r
+    except Exception as e:
+        print("[INIT] LoRa FAILED:", e)
+        return None
+
+def init_oled():
+    try:
+        o = OLED(sda=PIN_I2C_SDA, scl=PIN_I2C_SCL)
+        o.display_text("Booting...")
+        print("[INIT] OLED OK")
+        return o
+    except Exception as e:
+        print("[INIT] OLED FAILED:", e)
+        return None
+
+def main():
+    print("="*48)
+    cfg  = load_config()
+    nid  = int(cfg.get("id",1))
+    assert nid != 0, "Node 0 must use main_node0_gateway.py!"
+    print("[CONFIG] id={} name={}".format(nid, cfg.get("name")))
+    oled  = init_oled()
+    radio = init_lora()
+    if radio is None:
+        if oled: oled.display_text("LoRa FAIL\nHalted")
+        print("[FATAL] LoRa required. Halting.")
+        return
+    FollowerNode(cfg, radio, BU03(), oled).run()
+
+main()
