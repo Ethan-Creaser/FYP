@@ -13,7 +13,7 @@ from machine import SPI, Pin
 from utime import ticks_ms, sleep_ms  # ticks_ms and sleep_ms imported from utime
 from micropython import const
 
-EX_LED = Pin(15, Pin.OUT)
+# EX_LED removed — GPIO15 is used for UWB reset
 
 # ============================================================================
 # SX127x Register Definitions
@@ -227,8 +227,11 @@ class ULoRa:
         size = len(buffer)
         # Ensure packet does not exceed maximum allowed length
         size = min(size, MAX_PKT_LENGTH - FifoTxBaseAddr - current_length)
-        for byte in buffer:
-            self.write_register(REG_FIFO, byte)
+        # FIX: burst write entire buffer in one SPI transaction
+        self.pin_ss.value(0)
+        self.spi.write(bytes([REG_FIFO | 0x80]))  # FIFO register, write mode
+        self.spi.write(bytes(buffer[:size]))
+        self.pin_ss.value(1)
         # Update payload length
         self.write_register(REG_PAYLOAD_LENGTH, current_length + size)
         return size
@@ -297,22 +300,24 @@ class ULoRa:
         :param size: Expected payload size. If >0, uses implicit header mode.
         :return: True if a packet is received, otherwise False.
         """
-        irq_flags = self.get_irq_flags()
+        # FIX 1: use & not == so other IRQ bits (CRC ok etc) dont block detection
+        # FIX 2: dont switch to single RX — stay in continuous RX mode
+        irq_flags = self.read_register(REG_IRQ_FLAGS)  # read but dont clear yet
         self.set_implicit_header(size > 0)
         if size > 0:
             self.write_register(REG_PAYLOAD_LENGTH, size & 0xFF)
-        if irq_flags == IRQ_RX_DONE_MASK:
+        if irq_flags & IRQ_RX_DONE_MASK:
+            # Check for CRC error
+            if irq_flags & IRQ_PAYLOAD_CRC_ERROR_MASK:
+                self.write_register(REG_IRQ_FLAGS, irq_flags)  # clear flags
+                return False
+            self.write_register(REG_IRQ_FLAGS, irq_flags)  # clear flags
             return True
-        else:
-            # If not in single RX mode, reset FIFO pointer and enter single RX mode
-            if self.read_register(REG_OP_MODE) != (MODE_LONG_RANGE_MODE | MODE_RX_SINGLE):
-                self.write_register(REG_FIFO_ADDR_PTR, FifoRxBaseAddr)
-                self.write_register(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_SINGLE)
         return False
     
     def read_payload(self):
         """
-        Read the received payload from the FIFO.
+        Read the received payload from the FIFO using burst SPI read.
         
         :return: Payload data as bytes.
         """
@@ -323,9 +328,14 @@ class ULoRa:
             packet_length = self.read_register(REG_PAYLOAD_LENGTH)
         else:
             packet_length = self.read_register(REG_RX_NB_BYTES)
-        payload = bytearray()
-        for _ in range(packet_length):
-            payload.append(self.read_register(REG_FIFO))
+        if packet_length == 0:
+            return b""
+        # FIX 3: burst read entire payload in one SPI transaction
+        # byte-by-byte reads are too slow and corrupt the data
+        self.pin_ss.value(0)
+        self.spi.write(bytes([REG_FIFO & 0x7F]))  # FIFO register, read mode
+        payload = self.spi.read(packet_length)
+        self.pin_ss.value(1)
         self.collect_garbage()
         return bytes(payload)
     
