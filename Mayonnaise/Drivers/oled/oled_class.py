@@ -7,7 +7,7 @@ from Drivers.oled import ssd1306
 import time
 
 class OLED:
-    def __init__(self, sda=8, scl=9, width=128, height=64, freq=400000):
+    def __init__(self, sda=9, scl=8, width=128, height=64, freq=400000):
         i2c = I2C(0, scl=Pin(scl), sda=Pin(sda), freq=freq)
         self.width = width
         self.height = height

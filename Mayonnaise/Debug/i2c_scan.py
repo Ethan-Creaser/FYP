@@ -1,6 +1,6 @@
 from machine import I2C, Pin
 
-i2c = I2C(0, scl=Pin(9), sda=Pin(8), freq=400000)
+i2c = I2C(0, scl=Pin(8), sda=Pin(9), freq=400000)
 
 devices = i2c.scan()
 
