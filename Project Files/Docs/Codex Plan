@@ -1,0 +1,107 @@
+Plan
+
+Recommended Architecture For The Egg Mesh Network
+Summary
+Use a hierarchical event-driven architecture, not a single flat state machine. Your current diagram in State Diagram.jpg has the right behaviors, but several of them are better modeled as background services rather than exclusive states.
+
+The recommended runtime is:
+
+Top-level modes
+BOOTSTRAP -> DISCOVERY_MAP_BUILD -> OPERATIONAL -> LOCAL_REPAIR -> SAFE_RECOVERY
+
+Always-on services inside those modes
+LoRa comms, health monitoring, routing/relay, power manager, sensor scheduler
+
+Temporary mission overlay
+ROVER_ASSIST runs as a temporary overlay on top of OPERATIONAL, instead of replacing the whole node state.
+
+This fits your brief in context.txt and also matches the fact that the current codebase is still mostly open for structure, with only config and the BU03 driver meaningfully started in config.json and bu03.py.
+
+Key Design Changes
+Change 1: remove Message Hopping as a standalone state.
+Relay/forwarding should be a routing service that is active whenever the LoRa stack is active. A node should not “switch into” hopping mode just because a packet arrives.
+
+Change 2: remove Heartbeat/check heartbeat as the central hub state.
+Heartbeat emission, timeout tracking, and neighbor-health scoring should run continuously in the background. Otherwise the whole node logic becomes fragile and overly serialized.
+
+Change 3: make Deep Sleep a power policy, not a peer state.
+Sleep should be entered whenever no urgent jobs are pending and the wake sources are armed. This gives cleaner control than explicitly bouncing between “heartbeat” and “sleep”.
+
+Change 4: split meshing into two phases.
+Use DISCOVERY first to find LoRa neighbors, then MAP_BUILD to do UWB ranging only with valid nearby peers. This avoids expensive full-network ranging.
+
+Change 5: replace “any health change -> full remesh” with staged repair.
+On a missed heartbeat, mark a node suspect, confirm over a short retry window, then run local repair only around the affected neighborhood. Only escalate to broader remapping if connectivity or reference integrity is actually broken.
+
+Change 6: make rover localisation a bounded mission mode.
+Rover support should preempt low-priority sensing traffic, but not suspend routing or health monitoring. That keeps the mesh alive while helping the rover.
+
+Recommended Runtime Structure
+Node context
+One shared state object holding node ID, current mode, config, neighbor table, local coordinates, route table, pending jobs, wake reason, and fault flags.
+
+Drivers
+sx1278 driver, bu03 driver, thermistor reader, sleep/wake abstraction, persistent config store.
+bu03.py should stay hardware-focused only; topology or localisation policy should live above it.
+
+Services
+RadioService: packet RX/TX, ACKs, retries, deduplication
+HealthService: heartbeat send/receive, suspicion timers, liveness scoring
+TopologyService: neighbor table, reference election, map confidence, repair triggers
+RoutingService: next-hop selection, relay rules, bounded flood for control packets
+SensorService: thermistor sampling, buffering, periodic report scheduling
+MissionService: rover start/stop commands and localisation window scheduling
+PowerService: idle detection, sleep entry, wake source handling
+
+Mode manager
+A small hierarchical FSM that decides which services are enabled, their duty cycle, and which timers are allowed to wake the system.
+
+Interfaces / Protocol Decisions
+Control packet types
+HELLO, HEARTBEAT, HEARTBEAT_ACK, RANGE_REQ, RANGE_RESP, MAP_UPDATE, ROUTE_ADVERTISE, REPAIR_REQ, ROVER_START, ROVER_STOP
+
+Data packet types
+SENSOR_REPORT, LOCALISATION_RESULT, RELAY_DATA
+
+Core in-memory records
+NeighborRecord(node_id, last_seen, rssi, snr, uwb_range, status, link_cost)
+RouteEntry(destination, next_hop, metric, age)
+NodePose(reference_id, x, y, confidence)
+PendingJob(type, deadline, retries)
+
+Routing choice
+Use bounded flooding for discovery/repair control traffic and table-based next-hop forwarding for normal data. For 14 nodes, this is much simpler and more reliable than a full complex mesh protocol stack.
+
+How The Revised State Diagram Should Look
+BOOTSTRAP
+Load config, bring up drivers, self-test radios/UWB, restore persisted state.
+
+DISCOVERY_MAP_BUILD
+Discover LoRa neighbors, elect a temporary reference, schedule UWB ranging windows, build the local map, publish topology summary.
+
+OPERATIONAL
+Normal low-duty-cycle mode. Heartbeats, routing, relay, sensor scheduling, and sleep policy all run here.
+
+LOCAL_REPAIR
+Triggered by new-node detection, confirmed missing heartbeat, or degraded route quality. Recheck only affected neighbors, refresh routes, rebuild pose confidence if needed.
+
+SAFE_RECOVERY
+Used if the reference disappears, map confidence collapses, or repeated radio/UWB faults occur. Fall back to discovery and rebuild cleanly.
+
+ROVER_ASSIST overlay
+Temporarily increases UWB activity and prioritizes localisation responses while leaving health and routing alive.
+
+Test Plan
+Deploy 14 simulated nodes and verify they all reach OPERATIONAL with stable neighbor tables.
+Kill one interior relay node and confirm nearby nodes enter LOCAL_REPAIR without forcing a full-network rebuild.
+Add a new node after deployment and confirm controlled discovery plus route insertion.
+Trigger rover mode during normal sensing and confirm sensor traffic is deferred but heartbeat/routing continues.
+Force duplicate LoRa packets and verify deduplication prevents endless relay loops.
+Force repeated missed heartbeats and verify suspect -> confirm lost -> repair sequencing.
+Verify idle nodes sleep correctly and wake on timer or LoRa interrupt without losing topology state.
+Assumptions And Defaults
+Assume distributed identical eggs with temporary election of a logical reference node, not a permanently special hardware coordinator.
+Assume reliability is more important than maximum battery savings, so modest extra control traffic is acceptable.
+Assume rover support is a temporary service mode, not the network’s permanent primary purpose.
+Assume localisation is 2D relative mapping unless you later need full 3D trilateration.
+I could not extract useful pin-level detail from the schematic PDF in this environment, so this recommendation is based primarily on the project brief, the state diagram, and the current driver/config layout.

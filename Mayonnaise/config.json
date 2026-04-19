@@ -1,7 +1,27 @@
 {
-    "name" : "",
-    "id" : 0,
-    "role" : 0,
-    "channel" : 1,
-    "rate" : 1
+    "node_id": 0,
+    "node_name": "egg_0",
+    "base_station_id": 0,
+
+    "heartbeat_interval_ms": 30000,
+    "sensor_interval_ms": 60000,
+    "range_interval_ms": 10000,
+    "display_interval_ms": 1000,
+    "neighbour_suspect_ms": 75000,
+    "neighbour_lost_ms": 120000,
+    "repair_window_ms": 15000,
+    "seen_cache_ms": 300000,
+    "default_ttl": 5,
+
+    "lora_frequency": 433000000,
+    "lora_tx_power": 10,
+    "lora_bandwidth": 125000,
+    "lora_spreading_factor": 9,
+
+    "uwb_id": 0,
+    "uwb_role": 0,
+    "uwb_channel": 1,
+    "uwb_rate": 1,
+
+    "thermistor_pin": null
 }

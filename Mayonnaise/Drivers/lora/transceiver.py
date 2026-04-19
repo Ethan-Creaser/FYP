@@ -27,6 +27,13 @@ class LoRaTransceiver:
             }
 
         self.lora = ULoRa(spi, pins, parameters)
+        self.last_rssi = None
+        self.last_snr = None
+        self.start_receive()
+
+    def start_receive(self):
+        """Keep the radio in continuous receive mode for polling loops."""
+        self.lora.receive()
 
     def send(self, message):
         """
@@ -37,7 +44,32 @@ class LoRaTransceiver:
         if isinstance(message, str):
             message = message.encode()
         self.lora.println(message)
+        self.start_receive()
         print("Sent: {}".format(message))
+
+    def poll_receive(self):
+        """
+        Return one received packet if available, without blocking the loop.
+
+        The latest RSSI/SNR are stored on last_rssi and last_snr so the node
+        can update neighbour health without changing the older receive API.
+        """
+        if not self.lora.received_packet():
+            return None
+
+        payload = self.lora.read_payload()
+        self.last_rssi = self.lora.packet_rssi()
+        self.last_snr = self.lora.packet_snr()
+
+        if payload:
+            print("Received: {} | RSSI: {} dBm | SNR: {} dB".format(
+                payload, self.last_rssi, self.last_snr
+            ))
+            try:
+                return payload.decode()
+            except Exception:
+                return payload
+        return None
 
     def receive(self, timeout=5000):
         """
@@ -48,9 +80,11 @@ class LoRaTransceiver:
         """
         payload = self.lora.listen(timeout=timeout)
         if payload:
-            rssi = self.lora.packet_rssi()
-            snr = self.lora.packet_snr()
-            print("Received: {} | RSSI: {} dBm | SNR: {} dB".format(payload, rssi, snr))
+            self.last_rssi = self.lora.packet_rssi()
+            self.last_snr = self.lora.packet_snr()
+            print("Received: {} | RSSI: {} dBm | SNR: {} dB".format(
+                payload, self.last_rssi, self.last_snr
+            ))
             try:
                 return payload.decode()
             except Exception:
