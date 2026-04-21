@@ -1,6 +1,11 @@
 import gc
 import utime
 
+try:
+    import uos as os
+except ImportError:
+    import os
+
 from neighbour_table import NeighbourTable
 from node_logger import NodeLogger
 from timers import due, elapsed_ms
@@ -19,6 +24,20 @@ from packets import (
     packet_uid,
     relay_copy,
 )
+
+
+def new_start_sequence():
+    '''
+    creates a random-ish starting packet sequence number for this boot
+    inputs: none
+    outputs: (int) starting sequence number
+    '''
+    try:
+        data = os.urandom(2)
+        boot_id = (data[0] << 8) | data[1]
+    except Exception:
+        boot_id = utime.ticks_ms() & 0xFFFF
+    return boot_id * 1000
 
 
 class EggNode:
@@ -61,7 +80,7 @@ class EggNode:
         lost_ms = config.get("neighbour_lost_ms", 120000)
         self.neighbours = NeighbourTable(suspect_ms, lost_ms)
 
-        self.seq = 0
+        self.seq = new_start_sequence()
         self.seen_packets = {}
 
         self.started = False
