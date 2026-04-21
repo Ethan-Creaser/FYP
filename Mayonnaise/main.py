@@ -1,3 +1,6 @@
+import time
+time.sleep(2)
+
 import utime
 
 try:
@@ -10,6 +13,20 @@ from Drivers.oled.oled_class import OLED
 from Drivers.thermistor import Thermistor
 from Drivers.uwb.bu03 import BU03
 from node import EggNode
+
+
+LOG_WIDTH = 48
+
+
+def print_section(title):
+    print("")
+    print("=" * LOG_WIDTH)
+    print(title)
+    print("=" * LOG_WIDTH)
+
+
+def print_item(label, value):
+    print("  {:<18} {}".format(label + ":", value))
 
 
 DEFAULT_CONFIG = {
@@ -43,8 +60,9 @@ def load_config(path="config.json"):
         with open(path, "r") as handle:
             user_config = json.load(handle)
         config.update(user_config)
+        print_item("Config", "loaded from {}".format(path))
     except Exception as exc:
-        print("Config load failed, using defaults:", exc)
+        print_item("Config", "using defaults ({})".format(exc))
     return config
 
 
@@ -52,10 +70,10 @@ def make_oled():
     try:
         oled = OLED()
         oled.display_text("Initialising...")
-        print("OLED initialised OK")
+        print_item("OLED", "initialised")
         return oled
     except Exception as exc:
-        print("OLED init failed:", exc)
+        print_item("OLED", "failed ({})".format(exc))
         return None
 
 
@@ -69,12 +87,12 @@ def make_radio(config, oled=None):
 
     try:
         radio = LoRaTransceiver(parameters=parameters)
-        print("LoRa initialised OK")
+        print_item("LoRa", "initialised")
         if oled:
             oled.display_text("LoRa OK\nStarting node")
         return radio
     except Exception as exc:
-        print("LoRa init failed:", exc)
+        print_item("LoRa", "failed ({})".format(exc))
         if oled:
             oled.display_text("LoRa FAIL\n{}".format(exc))
         return None
@@ -83,44 +101,54 @@ def make_radio(config, oled=None):
 def make_uwb(config):
     try:
         uwb = BU03()
-        print("UWB initialised OK")
+        print_item("UWB", "initialised")
         return uwb
     except Exception as exc:
-        print("UWB init failed:", exc)
+        print_item("UWB", "failed ({})".format(exc))
         return None
 
 
 def make_thermistor(config):
     pin = config.get("thermistor_pin")
     if pin is None:
-        print("Thermistor disabled: set thermistor_pin in config.json")
+        print_item("Thermistor", "disabled")
         return None
 
     try:
         thermistor = Thermistor(pin)
-        print("Thermistor initialised OK on pin {}".format(pin))
+        print_item("Thermistor", "initialised on pin {}".format(pin))
         return thermistor
     except Exception as exc:
-        print("Thermistor init failed:", exc)
+        print_item("Thermistor", "failed ({})".format(exc))
         return None
 
 
 def main():
+    print_section("EGG NODE BOOT")
+    print_item("Serial", "connected")
+
     config = load_config()
+
+    print_section("HARDWARE STARTUP")
     oled = make_oled()
     radio = make_radio(config, oled)
     uwb = make_uwb(config)
     thermistor = make_thermistor(config)
 
     node = EggNode(config, radio, uwb=uwb, thermistor=thermistor, oled=oled)
-    print("Egg node {} started".format(config["node_id"]))
+
+    print_section("NODE STARTED")
+    print_item("Node", "{} ({})".format(config["node_name"], config["node_id"]))
+    print_item("Base station", config["base_station_id"])
+    print_item("Heartbeat", "{} ms".format(config["heartbeat_interval_ms"]))
+    print_item("LoRa frequency", "{} Hz".format(config["lora_frequency"]))
 
     try:
         while True:
             node.poll(utime.ticks_ms())
             utime.sleep_ms(50)
     except KeyboardInterrupt:
-        print("Stopped.")
+        print_section("NODE STOPPED")
 
 
 main()

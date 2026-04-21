@@ -3,7 +3,7 @@
     "node_name": "egg_0",
     "base_station_id": 0,
 
-    "heartbeat_interval_ms": 30000,
+    "heartbeat_interval_ms": 5000,
     "sensor_interval_ms": 60000,
     "range_interval_ms": 10000,
     "display_interval_ms": 1000,

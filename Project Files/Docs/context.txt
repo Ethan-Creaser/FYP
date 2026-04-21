@@ -8,11 +8,11 @@ Here is a break down of the system's operation
 1. nodes (eggs) will be deployed randomly 
 2. nodes will localise with each other to form a local map where each node has a coordinate relative to a reference egg
 3. meshing (using an appropriate meshing strategy) with all the other eggs within its range
-4. using an appropriate heartbeat strategy to monitor whether surrounding eggs are operational and let other eggs know that it is functional
+4. using an appropriate heartbeat strategy (send heartbeat every 30 seconds) to monitor whether surrounding eggs are operational and let other eggs know that it is functional
 5. eggs acting as a relay to send data if they receive a packet
 6. if a change in the system health occurs (i.e. an egg dies and the surrounding eggs no longer receive its heartbeat or a new eggs heartbeat is detected), the system should go into meshing recovery mode to confirm which eggs are within its range
 7. the egg should go into a deep sleep mode while it isn't doing anything only woken up by receiving a lora package
 8. Localisation mode where it is sending data from its UWB to a rover that is using it for position estimate
-9. after a time has elapsed the egg should send its sensor data from an onboard thermistor
+9. every 1 minute the egg should send its sensor data from an onboard thermistor such that a temperature map can be made by collating all the data for a given time
 
 This is the current plan, however, please feel free to change any of the specifics of the architecture to make the implementation work or run faster/better but notify me where you do.

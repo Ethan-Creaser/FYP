@@ -20,6 +20,9 @@ from packets import (
 )
 
 
+LOG_WIDTH = 48
+
+
 class EggNode:
     def __init__(self, config, radio, uwb=None, thermistor=None, oled=None):
         self.config = config
@@ -56,8 +59,53 @@ class EggNode:
         self.last_sensor_report = None
         self.last_range_report = None
         self.last_display = None
+        self.last_serial_status = None
         self.last_rx = "-"
         self.last_tx = "-"
+
+    def log_event(self, title, items=None):
+        print("")
+        print("-" * LOG_WIDTH)
+        print(title)
+        print("-" * LOG_WIDTH)
+        if items:
+            for label, value in items:
+                self.log_item(label, value)
+
+    def log_item(self, label, value):
+        print("  {:<14} {}".format(label + ":", value))
+
+    def node_label(self, node_id):
+        if node_id is BROADCAST:
+            return "broadcast"
+        return "egg {}".format(node_id)
+
+    def log_packet(self, direction, packet, extra=None, compact=False):
+        packet_type = packet.get("t", "PACKET")
+        if compact:
+            details = [
+                "src={}".format(self.node_label(packet.get("src"))),
+                "to={}".format(self.node_label(packet.get("dst"))),
+                "via={}".format(self.node_label(packet.get("via"))),
+                "seq={}".format(packet.get("seq")),
+                "ttl={}".format(packet.get("ttl")),
+            ]
+            if extra:
+                for label, value in extra:
+                    details.append("{}={}".format(label.lower(), value))
+            print("[{} {}] {}".format(direction, packet_type, " ".join(details)))
+            return
+
+        items = [
+            ("Source", self.node_label(packet.get("src"))),
+            ("To", self.node_label(packet.get("dst"))),
+            ("Via", self.node_label(packet.get("via"))),
+            ("Seq", packet.get("seq")),
+            ("TTL", packet.get("ttl")),
+        ]
+        if extra:
+            items.extend(extra)
+        self.log_event("{} {}".format(direction, packet.get("t", "PACKET")), items)
 
     def poll(self, now):
         self.poll_lora(now)
@@ -98,7 +146,7 @@ class EggNode:
         try:
             raw = self.radio.poll_receive()
         except Exception as exc:
-            print("LoRa poll error:", exc)
+            self.log_event("LORA POLL ERROR", [("Error", exc)])
             return
 
         if raw is None:
@@ -106,7 +154,7 @@ class EggNode:
 
         packet = decode_packet(raw)
         if packet is None:
-            print("Dropped non-MVP packet:", raw)
+            self.log_event("DROPPED PACKET", [("Reason", "not MVP format"), ("Raw", raw)])
             return
 
         self.handle_packet(packet, now, self.radio.last_rssi, self.radio.last_snr)
@@ -129,7 +177,14 @@ class EggNode:
 
         packet_type = packet.get("t")
         self.last_rx = "{} from {}".format(packet_type, src)
-        print("RX {} from {} via {} ttl={}".format(packet_type, src, via, packet.get("ttl")))
+        extra = []
+        if packet_type == HEARTBEAT:
+            extra.append(("status", packet.get("p", {}).get("status", "ok")))
+        if rssi is not None:
+            extra.append(("RSSI", rssi))
+        if snr is not None:
+            extra.append(("SNR", snr))
+        self.log_packet("RX", packet, extra, compact=(packet_type == HEARTBEAT))
 
         if is_for_node(packet, self.node_id):
             if packet_type == HELLO:
@@ -148,26 +203,26 @@ class EggNode:
         self.relay_packet(packet)
 
     def handle_hello(self, packet, now):
-        print("HELLO from egg {}".format(packet.get("src")))
+        payload = packet.get("p", {})
+        self.log_item("Name", payload.get("name", "-"))
 
     def handle_heartbeat(self, packet, now):
-        payload = packet.get("p", {})
-        print("Heartbeat from egg {} status={}".format(packet.get("src"), payload.get("status", "ok")))
+        pass
 
     def handle_sensor_report(self, packet, now):
-        print("Sensor report from egg {}: {}".format(packet.get("src"), packet.get("p", {})))
+        self.log_item("Reading", packet.get("p", {}))
 
     def handle_range_report(self, packet, now):
-        print("Range report from egg {}: {}".format(packet.get("src"), packet.get("p", {})))
+        self.log_item("Ranges", packet.get("p", {}))
 
     def handle_rover_start(self, packet, now):
         seconds = packet.get("p", {}).get("seconds", 60)
         self.rover_until = utime.ticks_add(now, int(seconds) * 1000)
-        print("Rover assist started for {} seconds".format(seconds))
+        self.log_item("Rover", "started for {} seconds".format(seconds))
 
     def handle_rover_stop(self, packet, now):
         self.rover_until = None
-        print("Rover assist stopped")
+        self.log_item("Rover", "stopped")
 
     def send_packet(self, packet):
         if self.radio is None:
@@ -182,7 +237,7 @@ class EggNode:
             self.last_tx = "{} seq {}".format(packet.get("t"), packet.get("seq"))
             return True
         except Exception as exc:
-            print("LoRa send error:", exc)
+            self.log_event("LORA SEND ERROR", [("Error", exc)])
             return False
 
     def send_hello(self, now):
@@ -194,7 +249,7 @@ class EggNode:
             ttl=self.default_ttl,
             payload={"name": self.node_name},
         )
-        print("TX HELLO")
+        self.log_packet("TX", packet)
         self.send_packet(packet)
 
     def send_heartbeat(self, now):
@@ -206,7 +261,7 @@ class EggNode:
             ttl=3,
             payload={"status": "ok"},
         )
-        print("TX HEARTBEAT")
+        self.log_packet("TX", packet, [("status", "ok")], compact=True)
         if self.send_packet(packet):
             self.last_heartbeat = now
 
@@ -218,7 +273,7 @@ class EggNode:
         try:
             reading = self.thermistor.read()
         except Exception as exc:
-            print("Thermistor read error:", exc)
+            self.log_event("THERMISTOR READ ERROR", [("Error", exc)])
             return
 
         packet = make_packet(
@@ -229,7 +284,7 @@ class EggNode:
             ttl=self.default_ttl,
             payload=reading,
         )
-        print("TX SENSOR_REPORT {}".format(reading))
+        self.log_packet("TX", packet, [("Reading", reading)])
         self.send_packet(packet)
 
     def send_range_report(self, now):
@@ -240,7 +295,7 @@ class EggNode:
         try:
             distances = self.uwb.read_distance(timeout_ms=50)
         except Exception as exc:
-            print("UWB read error:", exc)
+            self.log_event("UWB READ ERROR", [("Error", exc)])
             return
 
         if not distances:
@@ -254,7 +309,7 @@ class EggNode:
             ttl=3,
             payload={"d": distances},
         )
-        print("TX RANGE_REPORT")
+        self.log_packet("TX", packet, [("Ranges", distances)])
         self.send_packet(packet)
 
     def relay_packet(self, packet):
@@ -262,15 +317,13 @@ class EggNode:
         if relayed is None:
             return
 
-        print("Relay {} from {} ttl={}".format(
-            relayed.get("t"), relayed.get("src"), relayed.get("ttl")
-        ))
+        self.log_packet("RELAY", relayed, compact=True)
         self.send_packet(relayed)
 
     def start_repair(self, now):
         self.needs_repair = False
         self.repair_until = utime.ticks_add(now, self.repair_window_ms)
-        print("Repair refresh: broadcasting HELLO")
+        self.log_event("REPAIR REFRESH", [("Action", "broadcast HELLO")])
         self.send_hello(now)
 
     def next_seq(self):
@@ -295,9 +348,17 @@ class EggNode:
         line4 = "TX {}".format(self.last_tx)
         text = "{}\n{}\n{}\n{}".format(line1, line2, line3, line4)
 
-        print(text.replace("\n", " | "))
+        if text != self.last_serial_status:
+            self.last_serial_status = text
+            self.log_event("STATUS", [
+                ("Node", "{} ({})".format(self.node_name, self.node_id)),
+                ("Neighbours", "alive {} / suspect {} / lost {}".format(alive, suspect, lost)),
+                ("Last RX", self.last_rx),
+                ("Last TX", self.last_tx),
+            ])
+
         if self.oled is not None:
             try:
                 self.oled.display_text(text)
             except Exception as exc:
-                print("OLED display error:", exc)
+                self.log_event("OLED DISPLAY ERROR", [("Error", exc)])
