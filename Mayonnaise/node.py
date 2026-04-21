@@ -24,8 +24,23 @@ LOG_WIDTH = 48
 
 
 class EggNode:
+    '''
+    main controller for one egg node in the LoRa/UWB mesh MVP
+    inputs: config (dict), radio (LoRaTransceiver or None), uwb (BU03 or None),
+            thermistor (Thermistor or None), oled (OLED or None)
+    outputs: EggNode object that can be repeatedly updated by calling poll(now)
+    '''
+
     def __init__(self, config, radio, uwb=None, thermistor=None, oled=None):
+        '''
+        creates the egg node and stores all runtime state used by the polling loop
+        inputs: config (dict), radio (LoRaTransceiver or None), uwb (BU03 or None),
+                thermistor (Thermistor or None), oled (OLED or None)
+        outputs: none
+        '''
         self.config = config
+
+        # stores its hardware objects
         self.radio = radio
         self.uwb = uwb
         self.thermistor = thermistor
@@ -64,6 +79,11 @@ class EggNode:
         self.last_tx = "-"
 
     def log_event(self, title, items=None):
+        '''
+        prints a formatted multi-line event block to the serial console
+        inputs: title (str), items (list of label/value tuples or None)
+        outputs: none
+        '''
         print("")
         print("-" * LOG_WIDTH)
         print(title)
@@ -73,14 +93,30 @@ class EggNode:
                 self.log_item(label, value)
 
     def log_item(self, label, value):
+        '''
+        prints one formatted label/value line to the serial console
+        inputs: label (str), value (any printable value)
+        outputs: none
+        '''
         print("  {:<14} {}".format(label + ":", value))
 
     def node_label(self, node_id):
+        '''
+        converts a node id into a human-readable label for logs
+        inputs: node_id (int or None): node id, or None for broadcast packets
+        outputs: (str) readable node label
+        '''
         if node_id is BROADCAST:
             return "broadcast"
         return "egg {}".format(node_id)
 
     def log_packet(self, direction, packet, extra=None, compact=False):
+        '''
+        prints a packet in either compact or detailed serial log format
+        inputs: direction (str), packet (dict), extra (list of label/value tuples or None),
+                compact (bool): true for one-line logs
+        outputs: none
+        '''
         packet_type = packet.get("t", "PACKET")
         if compact:
             details = [
@@ -108,6 +144,11 @@ class EggNode:
         self.log_event("{} {}".format(direction, packet.get("t", "PACKET")), items)
 
     def poll(self, now):
+        '''
+        runs one full polling-loop update for the node
+        inputs: now (int): current MicroPython time from utime.ticks_ms()
+        outputs: none
+        '''
         self.poll_lora(now)
 
         if not self.started:
@@ -140,6 +181,11 @@ class EggNode:
         gc.collect()
 
     def poll_lora(self, now):
+        '''
+        checks for one incoming LoRa packet without blocking the main loop
+        inputs: now (int): current MicroPython time from utime.ticks_ms()
+        outputs: none
+        '''
         if self.radio is None:
             return
 
@@ -160,6 +206,11 @@ class EggNode:
         self.handle_packet(packet, now, self.radio.last_rssi, self.radio.last_snr)
 
     def handle_packet(self, packet, now, rssi=None, snr=None):
+        '''
+        processes one decoded incoming packet and relays it if needed
+        inputs: packet (dict), now (int), rssi (int/float or None), snr (int/float or None)
+        outputs: none
+        '''
         src = packet.get("src")
         if src == self.node_id:
             return
@@ -203,28 +254,63 @@ class EggNode:
         self.relay_packet(packet)
 
     def handle_hello(self, packet, now):
+        '''
+        handles a HELLO packet from another egg
+        inputs: packet (dict), now (int): current MicroPython time
+        outputs: none
+        '''
         payload = packet.get("p", {})
         self.log_item("Name", payload.get("name", "-"))
 
     def handle_heartbeat(self, packet, now):
+        '''
+        handles a HEARTBEAT packet from another egg
+        inputs: packet (dict), now (int): current MicroPython time
+        outputs: none
+        '''
         pass
 
     def handle_sensor_report(self, packet, now):
+        '''
+        handles a SENSOR_REPORT packet from another egg
+        inputs: packet (dict), now (int): current MicroPython time
+        outputs: none
+        '''
         self.log_item("Reading", packet.get("p", {}))
 
     def handle_range_report(self, packet, now):
+        '''
+        handles a RANGE_REPORT packet from another egg
+        inputs: packet (dict), now (int): current MicroPython time
+        outputs: none
+        '''
         self.log_item("Ranges", packet.get("p", {}))
 
     def handle_rover_start(self, packet, now):
+        '''
+        handles a ROVER_START packet and enables rover assist for a fixed time
+        inputs: packet (dict), now (int): current MicroPython time
+        outputs: none
+        '''
         seconds = packet.get("p", {}).get("seconds", 60)
         self.rover_until = utime.ticks_add(now, int(seconds) * 1000)
         self.log_item("Rover", "started for {} seconds".format(seconds))
 
     def handle_rover_stop(self, packet, now):
+        '''
+        handles a ROVER_STOP packet and disables rover assist
+        inputs: packet (dict), now (int): current MicroPython time
+        outputs: none
+        '''
         self.rover_until = None
         self.log_item("Rover", "stopped")
 
     def send_packet(self, packet):
+        '''
+        encodes and sends one packet over LoRa
+        inputs: packet (dict): packet created by make_packet or relay_copy
+        outputs: (bool) true if send succeeds, false if radio is missing or send fails
+        '''
         if self.radio is None:
             return False
 
@@ -241,6 +327,11 @@ class EggNode:
             return False
 
     def send_hello(self, now):
+        '''
+        broadcasts a HELLO packet announcing this egg to nearby nodes
+        inputs: now (int): current MicroPython time
+        outputs: none
+        '''
         packet = make_packet(
             HELLO,
             self.node_id,
@@ -253,6 +344,11 @@ class EggNode:
         self.send_packet(packet)
 
     def send_heartbeat(self, now):
+        '''
+        broadcasts a HEARTBEAT packet showing this egg is still alive
+        inputs: now (int): current MicroPython time
+        outputs: none
+        '''
         packet = make_packet(
             HEARTBEAT,
             self.node_id,
@@ -266,6 +362,11 @@ class EggNode:
             self.last_heartbeat = now
 
     def send_sensor_report(self, now):
+        '''
+        reads the thermistor and sends a SENSOR_REPORT packet to the base station
+        inputs: now (int): current MicroPython time
+        outputs: none
+        '''
         self.last_sensor_report = now
         if self.thermistor is None:
             return
@@ -288,6 +389,11 @@ class EggNode:
         self.send_packet(packet)
 
     def send_range_report(self, now):
+        '''
+        reads UWB distances and broadcasts a RANGE_REPORT packet if data is available
+        inputs: now (int): current MicroPython time
+        outputs: none
+        '''
         self.last_range_report = now
         if self.uwb is None:
             return
@@ -313,6 +419,11 @@ class EggNode:
         self.send_packet(packet)
 
     def relay_packet(self, packet):
+        '''
+        forwards a packet by reducing its TTL and setting this egg as the via node
+        inputs: packet (dict): packet received from another node
+        outputs: none
+        '''
         relayed = relay_copy(packet, self.node_id)
         if relayed is None:
             return
@@ -321,16 +432,31 @@ class EggNode:
         self.send_packet(relayed)
 
     def start_repair(self, now):
+        '''
+        starts a simple repair refresh by broadcasting a new HELLO packet
+        inputs: now (int): current MicroPython time
+        outputs: none
+        '''
         self.needs_repair = False
         self.repair_until = utime.ticks_add(now, self.repair_window_ms)
         self.log_event("REPAIR REFRESH", [("Action", "broadcast HELLO")])
         self.send_hello(now)
 
     def next_seq(self):
+        '''
+        increments and returns this node's next packet sequence number
+        inputs: none
+        outputs: (int) next sequence number
+        '''
         self.seq += 1
         return self.seq
 
     def clean_seen_cache(self, now):
+        '''
+        removes old packet ids from the duplicate-detection cache
+        inputs: now (int): current MicroPython time
+        outputs: none
+        '''
         old = []
         for uid, seen_at in self.seen_packets.items():
             if elapsed_ms(now, seen_at) > self.seen_cache_ms:
@@ -340,6 +466,11 @@ class EggNode:
             del self.seen_packets[uid]
 
     def update_display(self, now):
+        '''
+        updates the OLED and prints node status if the serial status changed
+        inputs: now (int): current MicroPython time
+        outputs: none
+        '''
         self.last_display = now
         alive, suspect, lost = self.neighbours.summary()
         line1 = "{} id {}".format(self.node_name, self.node_id)
