@@ -3,6 +3,12 @@ time.sleep(2)
 
 import utime
 
+from machine import Pin
+from time import sleep
+from neopixel import NeoPixel
+pin = Pin(38, Pin.OUT)                          # Pin number for v1 of the above DevKitC, use pin 38 for v1.1
+np = NeoPixel(pin, 1)  
+
 try:
     import ujson as json
 except ImportError:
@@ -124,6 +130,9 @@ def make_thermistor(config):
 
 
 def main():
+    np[0] = (255,0,0) # red
+    np.write()
+    sleep(0.1)
     print_section("EGG NODE BOOT")
     print_item("Serial", "connected")
 
@@ -146,6 +155,16 @@ def main():
     try:
         while True:
             node.poll(utime.ticks_ms())
+            alive, _, _ = node.neighbours.summary()
+            if alive >= 2:
+                np[0] = (0,255,0) # green
+                np.write()
+            elif alive >= 1:
+                np[0] = (255,255,0) # yellow
+                np.write()
+            else:
+                np[0] = (255,0,0) # red
+                np.write()
             utime.sleep_ms(50)
     except KeyboardInterrupt:
         print_section("NODE STOPPED")
