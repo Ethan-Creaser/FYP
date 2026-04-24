@@ -95,5 +95,8 @@ def main():
     except KeyboardInterrupt:
         print("Stopped.")
 
+    except Exception as e:
+        print("Unexpected error:", e)
+
 
 main()
