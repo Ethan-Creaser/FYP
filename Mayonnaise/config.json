@@ -1,6 +1,6 @@
 {
-    "node_id": 0,
-    "node_name": "egg_0",
+    "node_id": 7,
+    "node_name": "egg_7",
     "base_station_id": 0,
 
     "heartbeat_interval_ms": 5000,
