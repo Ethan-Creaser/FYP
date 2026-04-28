@@ -1,9 +1,0 @@
-﻿Designator,Footprint,Quantity,Value,LCSC Part #
-J1,JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical,1,Conn_01x02_Socket,
-"J2, J3, J4",JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical,3,Conn_01x02_Socket,
-"J5, J8",JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical,2,Conn_01x04_Socket,
-J6,JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical,1,Conn_01x03_Socket,
-J7,JST_XH_B5B-XH-A_1x05_P2.50mm_Vertical,1,Conn_01x05_Socket,
-U1,ESP32-S3-DEVKITC-1-N8R8,1,ESP32-S3-DEVKITC-1-N8R8,
-U2,Lora_Dev_Board,1,RA-02_LORA,
-U3,UWB_Female_Headers,1,~,
