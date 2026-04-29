@@ -1,7 +1,7 @@
 {
-  "node_id": 2,
-  "node_name": "egg_2",
-  "device_label": "egg-02",
+  "node_id": 7,
+  "node_name": "egg_7",
+  "device_label": "egg-07",
   "node_role": "field_egg",
   "ground_station_id": 99,
   "telemetry_enabled": true,
@@ -43,7 +43,6 @@
   "wifi_password": "YOUR_NETWORK_PASSWORD",
   "wifi_port": 80,
 
-  "bt_enabled": false,
-  "bt_name": "egg_2"
+  "bt_enabled": true
 }
 

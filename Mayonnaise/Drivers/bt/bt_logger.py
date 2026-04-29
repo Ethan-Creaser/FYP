@@ -1,3 +1,4 @@
+import gc
 import ubluetooth
 import utime
 from micropython import const
@@ -41,13 +42,14 @@ class BtLogger:
         self._name = name
         self._conn = None
 
+        gc.collect()
+        utime.sleep_ms(200)
         self._ble = ubluetooth.BLE()
         self._ble.active(True)
         self._ble.irq(self._irq)
 
         ((self._tx, _rx),) = self._ble.gatts_register_services((_NUS_SERVICE,))
         self._advertise()
-        print("BT: advertising as '{}'".format(name))
 
     def _irq(self, event, data):
         if event == _IRQ_CENTRAL_CONNECT:

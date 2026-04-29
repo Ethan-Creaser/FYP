@@ -1,6 +1,7 @@
 import time
 time.sleep(2)
 
+
 import utime
 
 from machine import Pin
@@ -89,7 +90,6 @@ DEFAULT_CONFIG = {
     "wifi_password": "",
     "wifi_port": 80,
     "bt_enabled": False,
-    "bt_name": None,         # defaults to node_name
 }
 
 
@@ -178,13 +178,17 @@ def make_bt(config):
         print_item("Bluetooth", "disabled")
         return None
     name = config.get("bt_name") or config.get("node_name", "egg")
-    try:
-        bt = BtLogger(name=name)
-        print_item("Bluetooth", "advertising as '{}'".format(name))
-        return bt
-    except Exception as exc:
-        print_item("Bluetooth", "failed ({})".format(exc))
-        return None
+    for attempt in range(1, 4):
+        try:
+            bt = BtLogger(name=name)
+            print_item("Bluetooth", "advertising as '{}'".format(name))
+            return bt
+        except Exception as exc:
+            print_item("Bluetooth", "attempt {} failed ({})".format(attempt, exc))
+            if attempt < 3:
+                import utime as _utime
+                _utime.sleep_ms(500)
+    return None
 
 
 def make_thermistor(config):
