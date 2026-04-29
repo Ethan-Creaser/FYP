@@ -11,16 +11,30 @@ class NodeLogger:
     outputs: NodeLogger object used by EggNode
     '''
 
+    def __init__(self):
+        self._outputs = []  # list of objects with a .log(line) method (WiFiLogger, BtLogger, …)
+
+    def add_output(self, output):
+        self._outputs.append(output)
+
+    def _log(self, line):
+        print(line)
+        for out in self._outputs:
+            try:
+                out.log(line)
+            except Exception:
+                pass
+
     def event(self, title, items=None):
         '''
         prints a formatted multi-line event block to the serial console
         inputs: title (str), items (list of label/value tuples or None)
         outputs: none
         '''
-        print("")
-        print("-" * LOG_WIDTH)
-        print(title)
-        print("-" * LOG_WIDTH)
+        self._log("")
+        self._log("-" * LOG_WIDTH)
+        self._log(title)
+        self._log("-" * LOG_WIDTH)
         if items:
             for label, value in items:
                 self.item(label, value)
@@ -31,7 +45,7 @@ class NodeLogger:
         inputs: label (str), value (any printable value)
         outputs: none
         '''
-        print("  {:<14} {}".format(label + ":", value))
+        self._log("  {:<14} {}".format(label + ":", value))
 
     def node_label(self, node_id):
         '''
@@ -62,7 +76,7 @@ class NodeLogger:
             if extra:
                 for label, value in extra:
                     details.append("{}={}".format(label.lower(), value))
-            print("[{} {}] {}".format(direction, packet_type, " ".join(details)))
+            self._log("[{} {}] {}".format(direction, packet_type, " ".join(details)))
             return
 
         items = [

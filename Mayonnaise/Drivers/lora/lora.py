@@ -59,6 +59,7 @@ MODE_STDBY              = const(0x01)
 MODE_TX                 = const(0x03)
 MODE_RX_CONTINUOUS      = const(0x05)
 MODE_RX_SINGLE          = const(0x06)
+MODE_CAD                = const(0x07)
 
 PA_OUTPUT_RFO_PIN       = const(0)
 PA_OUTPUT_PA_BOOST_PIN  = const(0x01)
@@ -67,10 +68,12 @@ PA_BOOST                = const(0x80)
 # ============================================================================
 # IRQ Masks
 # ============================================================================
-IRQ_TX_DONE_MASK        = const(0x08)
+IRQ_TX_DONE_MASK           = const(0x08)
 IRQ_PAYLOAD_CRC_ERROR_MASK = const(0x20)
-IRQ_RX_DONE_MASK        = const(0x40)
-IRQ_RX_TIME_OUT_MASK    = const(0x80)
+IRQ_RX_DONE_MASK           = const(0x40)
+IRQ_RX_TIME_OUT_MASK       = const(0x80)
+IRQ_CAD_DONE_MASK          = const(0x04)
+IRQ_CAD_DETECTED_MASK      = const(0x01)
 
 # ============================================================================
 # IQ Inversion Constants
@@ -381,7 +384,29 @@ class ULoRa:
         Put the module into sleep mode.
         """
         self.write_register(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP)
-    
+
+    def channel_active(self, timeout_ms=100):
+        """
+        Run one CAD cycle and return True if LoRa activity is detected.
+        Leaves the module in standby on exit regardless of result.
+
+        CAD duration is roughly 2 * 2^SF / BW — about 10 ms for SF9/BW125.
+        timeout_ms should be at least 2x the expected CAD time to be safe.
+        """
+        # Pre-clear both CAD flags before entering CAD mode
+        self.write_register(REG_IRQ_FLAGS, IRQ_CAD_DONE_MASK | IRQ_CAD_DETECTED_MASK)
+        self.write_register(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_CAD)
+        start = ticks_ms()
+        while not (self.read_register(REG_IRQ_FLAGS) & IRQ_CAD_DONE_MASK):
+            if ticks_ms() - start > timeout_ms:
+                # CAD timed out — treat as clear to avoid permanent stall
+                self.standby()
+                return False
+        detected = bool(self.read_register(REG_IRQ_FLAGS) & IRQ_CAD_DETECTED_MASK)
+        self.write_register(REG_IRQ_FLAGS, IRQ_CAD_DONE_MASK | IRQ_CAD_DETECTED_MASK)
+        self.standby()
+        return detected
+
     # ---------------------------
     # Configuration Methods
     # ---------------------------

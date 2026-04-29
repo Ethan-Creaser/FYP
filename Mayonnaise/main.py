@@ -25,6 +25,8 @@ from Drivers.lora.transceiver import LoRaTransceiver
 from Drivers.oled.oled_class import OLED
 from Drivers.thermistor import Thermistor
 from Drivers.uwb.bu03 import BU03
+from Drivers.wifi.wifi_logger import WiFiLogger
+from Drivers.bt.bt_logger import BtLogger
 try:
     import node as node_module
     EggNode = node_module.EggNode
@@ -81,6 +83,13 @@ DEFAULT_CONFIG = {
     "uwb_channel": 1,
     "uwb_rate": 1,
     "thermistor_pin": None,
+    "wifi_enabled": False,
+    "wifi_mode": "sta",      # "sta" = join existing network, "ap" = create hotspot
+    "wifi_ssid": None,
+    "wifi_password": "",
+    "wifi_port": 80,
+    "bt_enabled": False,
+    "bt_name": None,         # defaults to node_name
 }
 
 
@@ -138,6 +147,46 @@ def make_uwb(config):
         return None
 
 
+def make_wifi(config, oled=None):
+    if not config.get("wifi_enabled", False):
+        print_item("WiFi", "disabled")
+        return None
+    mode     = config.get("wifi_mode", "sta")
+    ssid     = config.get("wifi_ssid") or config.get("node_name", "egg")
+    password = config.get("wifi_password", "")
+    port     = config.get("wifi_port", 80)
+    try:
+        wl = WiFiLogger(ssid=ssid, password=password, port=port, mode=mode)
+        print_item("WiFi", "{}  ssid={}  ip={}  port={}".format(
+            mode.upper(), ssid, wl.ip, port))
+        if oled is not None:
+            try:
+                oled.display_text("WiFi {}\n{}\nport {}".format(
+                    mode.upper(), wl.ip, port))
+                import utime
+                utime.sleep_ms(3000)
+            except Exception:
+                pass
+        return wl
+    except Exception as exc:
+        print_item("WiFi", "failed ({})".format(exc))
+        return None
+
+
+def make_bt(config):
+    if not config.get("bt_enabled", False):
+        print_item("Bluetooth", "disabled")
+        return None
+    name = config.get("bt_name") or config.get("node_name", "egg")
+    try:
+        bt = BtLogger(name=name)
+        print_item("Bluetooth", "advertising as '{}'".format(name))
+        return bt
+    except Exception as exc:
+        print_item("Bluetooth", "failed ({})".format(exc))
+        return None
+
+
 def make_thermistor(config):
     pin = config.get("thermistor_pin")
     if pin is None:
@@ -170,8 +219,14 @@ def main():
     radio = make_radio(config, oled)
     uwb = make_uwb(config)
     thermistor = make_thermistor(config)
+    wifi = make_wifi(config, oled)
+    bt   = make_bt(config)
 
     node = EggNode(config, radio, uwb=uwb, thermistor=thermistor, oled=oled)
+    if wifi is not None:
+        node.logger.add_output(wifi)
+    if bt is not None:
+        node.logger.add_output(bt)
 
     print_section("NODE STARTED")
     print_item("Device", config["device_label"])
@@ -187,6 +242,10 @@ def main():
     try:
         while True:
             node.poll(utime.ticks_ms())
+            if wifi is not None:
+                wifi.poll()
+            if bt is not None:
+                bt.poll()
             alive, _, _ = node.neighbours.summary()
             if alive >= 2:
                 np[0] = (0,255,0) # green

@@ -1,5 +1,6 @@
 import gc
 import utime
+import urandom
 
 try:
     import uos as os
@@ -19,6 +20,7 @@ from packets import (
     BROADCAST,
     HEARTBEAT,
     HELLO,
+    IMAGE_OFFER,
     LOCALISE_DISCOVERY,
     LOCALISE_POSITION,
     LOCALISE_RESULT,
@@ -241,6 +243,14 @@ class EggNode:
         if raw is None:
             return
 
+        # Raw binary protocol packets (IMG chunks, RDY signals) are not JSON — discard quietly.
+        if isinstance(raw, (bytes, bytearray)):
+            if raw[:3] in (b"IMG", b"RDY", b"ACK"):
+                return
+        elif isinstance(raw, str):
+            if raw[:3] in ("IMG", "RDY", "ACK"):
+                return
+
         packet = decode_packet(raw)
         if packet is None:
             self.logger.event("DROPPED PACKET", [("Reason", "not MVP format"), ("Raw", raw)])
@@ -303,6 +313,8 @@ class EggNode:
                 self.handle_localise_result(packet, now)
             elif packet_type == LOCALISE_POSITION:
                 self.handle_localise_position(packet, now, rssi=rssi, snr=snr)
+            elif packet_type == IMAGE_OFFER:
+                self.handle_image_offer(packet, now)
 
         if self.should_relay(packet):
             self.relay_packet(packet)
@@ -334,6 +346,39 @@ class EggNode:
     def handle_rover_stop(self, packet, now):
         self.rover_until = None
         self.logger.item("Rover", "stopped")
+
+    def handle_image_offer(self, packet, now):
+        payload = packet.get("p", {})
+        filename = payload.get("file", "received_image.bin")
+        size = payload.get("size", 0)
+        self.logger.event("IMAGE OFFER", [("File", filename), ("Size", size)])
+
+        def _oled(text):
+            if self.oled is not None:
+                try:
+                    self.oled.display_text(text)
+                except Exception:
+                    pass
+
+        _oled("IMG offer rx\nSending RDY...")
+
+        def _progress(received, total):
+            self.logger.event("IMAGE RX", [("Chunk", received), ("Total", total)])
+            _oled("Receiving IMG\n{}/{} chunks".format(received, total))
+
+        result = self.radio.receive_image(output_path=filename, progress_cb=_progress)
+
+        if result is not None:
+            self.logger.event("IMAGE RECEIVED", [("File", result)])
+            _oled("IMG received!\nDisplaying...")
+            if self.oled is not None:
+                try:
+                    self.oled.display_image(result)
+                except Exception as exc:
+                    self.logger.event("OLED DISPLAY ERROR", [("Error", exc)])
+        else:
+            self.logger.event("IMAGE RECEIVE FAILED", [])
+            _oled("IMG RX failed\nno chunks rx")
 
     def handle_localise_discovery(self, packet, now):
         if not self.is_field_egg():
@@ -443,6 +488,103 @@ class EggNode:
         except Exception as exc:
             self.logger.event("LORA SEND ERROR", [("Error", exc)])
             return False
+
+    def send_image(self, path, dst):
+        '''
+        announces and sends a binary image file to a specific node over LoRa.
+        broadcasts an IMAGE_OFFER packet first so the destination enters receive
+        mode, waits briefly, then transfers the file in 240-byte chunks with ACKs.
+        inputs: path (str): local path to the .bin file
+                dst (int): destination node id
+        outputs: (bool) True if all chunks were acknowledged, False otherwise
+        '''
+        if self.radio is None:
+            return False
+
+        try:
+            with open(path, "rb") as f:
+                size = len(f.read())
+        except OSError as exc:
+            self.logger.event("IMAGE SEND ERROR", [("Error", exc)])
+            return False
+
+        packet = make_packet(
+            IMAGE_OFFER,
+            self.node_id,
+            dst,
+            self.next_seq(),
+            ttl=self.default_ttl,
+            payload={"file": path, "size": size},
+        )
+        MAX_OFFER_RETRIES = 10
+        READY_TIMEOUT_MS  = 6000
+
+        def _progress(sent, total, failed=False):
+            if failed:
+                self.logger.event("IMAGE TX FAILED", [("Chunk", sent), ("Total", total)])
+            else:
+                self.logger.event("IMAGE TX", [("Chunk", sent), ("Total", total)])
+            if self.oled is None:
+                return
+            if failed:
+                msg = "IMG FAILED\nchunk {}/{}".format(sent, total)
+            else:
+                msg = "Sending IMG\n{}/{} chunks".format(sent, total)
+            try:
+                self.oled.display_text(msg)
+            except Exception:
+                pass
+
+        total_chunks = (size + 239) // 240
+
+        def _oled_sender(text):
+            if self.oled is not None:
+                try:
+                    self.oled.display_text(text)
+                except Exception:
+                    pass
+
+        ready = False
+        for attempt in range(1, MAX_OFFER_RETRIES + 1):
+            _oled_sender("Offering IMG\n{}/{}".format(attempt, MAX_OFFER_RETRIES))
+            packet = make_packet(
+                IMAGE_OFFER,
+                self.node_id,
+                dst,
+                self.next_seq(),
+                ttl=self.default_ttl,
+                payload={"file": path, "size": size},
+            )
+            self.logger.event("IMAGE OFFER TX", [
+                ("File", path), ("Size", size), ("Dst", dst), ("Attempt", attempt)])
+            self.send_packet(packet)
+
+            start = utime.ticks_ms()
+            while utime.ticks_diff(utime.ticks_ms(), start) < READY_TIMEOUT_MS:
+                raw = self.radio.poll_receive()
+                if raw is not None:
+                    data = raw if isinstance(raw, bytes) else raw.encode()
+                    if data == b"RDY":
+                        self.logger.event("IMAGE RDY RECEIVED", [("Attempt", attempt)])
+                        _oled_sender("RDY received!\nSending IMG...")
+                        ready = True
+                        break
+                    self.logger.event("IMAGE RDY WAIT RX", [("Got", repr(data[:20]))])
+                utime.sleep_ms(10)
+
+            if ready:
+                break
+            self.logger.event("IMAGE OFFER NO RDY", [("Attempt", attempt)])
+            jitter = urandom.randint(200, 1000)
+            self.logger.event("IMAGE OFFER RETRY", [("JitterMs", jitter)])
+            utime.sleep_ms(jitter)
+
+        if not ready:
+            self.logger.event("IMAGE SEND ABORTED", [("Reason", "no RDY after retries")])
+            _oled_sender("IMG ABORTED\nno RDY rx")
+            return False
+
+        return self.radio.send_image(path, progress_cb=_progress)
 
     def send_hello(self, now):
         payload = {

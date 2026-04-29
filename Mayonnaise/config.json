@@ -35,6 +35,15 @@
   "uwb_channel": 1,
   "uwb_rate": 1,
 
-  "thermistor_pin": null
+  "thermistor_pin": null,
+
+  "wifi_enabled": false,
+  "wifi_mode": "sta",
+  "wifi_ssid": "YOUR_NETWORK_SSID",
+  "wifi_password": "YOUR_NETWORK_PASSWORD",
+  "wifi_port": 80,
+
+  "bt_enabled": false,
+  "bt_name": "egg_2"
 }
 
