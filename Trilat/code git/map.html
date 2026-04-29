@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UWB Node Map</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;900&display=swap');
+:root {
+  --bg:#070b12; --panel:#0a1220; --border:#1a3a5c;
+  --accent:#00e5ff; --accent2:#ff6b35;
+  --ok:#39ff14; --warn:#ffcc00; --danger:#ff2d55;
+  --text:#c8dff0; --muted:#4a7a9b;
+  --mono:'Share Tech Mono',monospace; --display:'Exo 2',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);
+  height:100vh;display:grid;grid-template-rows:48px 1fr;grid-template-columns:1fr 280px;overflow:hidden}
+
+header{grid-column:1/-1;display:flex;align-items:center;gap:16px;padding:0 20px;
+  background:var(--panel);border-bottom:1px solid var(--border)}
+.logo{font-family:var(--display);font-weight:900;font-size:1.2rem;
+  letter-spacing:.12em;color:var(--accent);text-transform:uppercase}
+.logo span{color:var(--accent2)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--danger);
+  box-shadow:0 0 7px var(--danger);transition:.4s}
+.dot.on{background:var(--ok);box-shadow:0 0 9px var(--ok)}
+#status{font-size:.7rem;color:var(--muted);flex:1}
+.ctrl{display:flex;gap:8px}
+button{background:transparent;border:1px solid var(--border);color:var(--text);
+  font-family:var(--mono);font-size:.65rem;padding:4px 10px;cursor:pointer;
+  letter-spacing:.08em;text-transform:uppercase;transition:.2s}
+button:hover,button.on{border-color:var(--accent);color:var(--accent)}
+
+#wrap{position:relative;overflow:hidden;background:var(--bg)}
+canvas{display:block;cursor:grab}canvas:active{cursor:grabbing}
+
+aside{background:var(--panel);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden}
+.aside-hdr{padding:10px 14px;border-bottom:1px solid var(--border);
+  font-family:var(--display);font-weight:600;font-size:.7rem;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+#list{flex:1;overflow-y:auto;padding:6px}
+#list::-webkit-scrollbar{width:3px}
+#list::-webkit-scrollbar-thumb{background:var(--border)}
+.card{border:1px solid var(--border);padding:8px 10px;margin-bottom:5px;
+  animation:cin .3s ease both;transition:border-color .3s,box-shadow .3s}
+@keyframes cin{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+.card.fresh{border-color:var(--accent);box-shadow:0 0 10px rgba(0,229,255,.15)}
+.card .nid{font-family:var(--display);font-weight:900;font-size:.95rem}
+.card .coords{font-size:.65rem;margin-top:2px}
+.card .meta{font-size:.6rem;color:var(--muted);margin-top:3px;display:flex;gap:8px}
+.bar{height:2px;margin-top:5px;background:var(--border);border-radius:1px;overflow:hidden}
+.bar-fill{height:100%;border-radius:1px;transition:width .4s}
+.aside-ftr{padding:8px 14px;border-top:1px solid var(--border);
+  font-size:.62rem;color:var(--muted);display:flex;justify-content:space-between}
+
+#tip{position:absolute;background:var(--panel);border:1px solid var(--accent);
+  padding:7px 11px;font-size:.67rem;pointer-events:none;opacity:0;
+  transition:opacity .15s;white-space:pre;line-height:1.7;z-index:10}
+#scale{position:absolute;bottom:14px;left:14px;font-size:.62rem;color:var(--muted);pointer-events:none}
+#scale-bar{width:60px;height:2px;background:var(--muted);margin-bottom:3px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">UWB<span>·</span>MAP</div>
+  <div class="dot" id="dot"></div>
+  <div id="status">Connecting…</div>
+  <div class="ctrl">
+    <button id="b-center">CENTER</button>
+    <button id="b-trail" class="on">TRAILS</button>
+    <button id="b-label">LABELS</button>
+    <button id="b-clear">CLEAR</button>
+  </div>
+</header>
+
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="tip"></div>
+  <div id="scale"><div id="scale-bar"></div><span id="scale-lbl"></span></div>
+</div>
+
+<aside>
+  <div class="aside-hdr">Node Registry</div>
+  <div id="list"></div>
+  <div class="aside-ftr">
+    <span id="count">0 nodes</span>
+    <span id="ts">—</span>
+  </div>
+</aside>
+
+<script>
+const WS = "ws://localhost:8765";
+const COLORS = ["#00e5ff","#ff6b35","#39ff14","#ffcc00","#ff2d55",
+                 "#bf00ff","#00ff99","#ff9900","#4fc3f7","#ea80fc"];
+const TRAIL = 50;
+
+let nodes={}, canvas, ctx;
+let scale=80, panX=0, panY=0;
+let drag=false, dragS;
+let showTrail=false, showLabel=true;
+
+// ── WebSocket ────────────────────────────────────────────────────────────────
+function connect(){
+  const ws=new WebSocket(WS);
+  ws.onopen=()=>{
+    document.getElementById("dot").classList.add("on");
+    document.getElementById("status").textContent="Connected to gateway";
+  };
+  ws.onclose=()=>{
+    document.getElementById("dot").classList.remove("on");
+    document.getElementById("status").textContent="Disconnected — reconnecting…";
+    setTimeout(connect,2000);
+  };
+  ws.onmessage=e=>{
+    const m=JSON.parse(e.data);
+    if(m.type==="SNAPSHOT") m.nodes.forEach(applyNode);
+    else if(m.type==="MAP")  applyNode(m);
+    else if(m.type==="STALE") { m.ids.forEach(id=>delete nodes[id]); renderSidebar(); }
+  };
+}
+
+function applyNode(n){
+  const id=n.id, col=COLORS[id%COLORS.length];
+  if(!nodes[id]) nodes[id]={...n,color:col,trail:[],fresh:true};
+  else{
+    const p=nodes[id];
+    // Only keep trail if position changed significantly (>5cm)
+    const dx = Math.abs(p.x - n.x), dy = Math.abs(p.y - n.y);
+    if(dx > 0.05 || dy > 0.05){
+      if(p.trail.length>=TRAIL) p.trail.shift();
+      p.trail.push([p.x,p.y]);
+    }
+    Object.assign(p,n); p.fresh=true;
+    setTimeout(()=>{ if(nodes[id]) nodes[id].fresh=false; },1500);
+  }
+  renderSidebar();
+  document.getElementById("ts").textContent=new Date().toLocaleTimeString();
+}
+
+// ── Canvas ───────────────────────────────────────────────────────────────────
+function w2s(wx,wy){ return [canvas.width/2+panX+wx*scale, canvas.height/2+panY-wy*scale]; }
+
+function drawGrid(){
+  const step=scale;
+  ctx.strokeStyle="#0d1a2a"; ctx.lineWidth=1;
+  const ox=(canvas.width/2+panX)%step, oy=(canvas.height/2+panY)%step;
+  for(let x=ox;x<canvas.width;x+=step){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
+  for(let y=oy;y<canvas.height;y+=step){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+  const [ax,ay]=w2s(0,0);
+  ctx.strokeStyle="rgba(0,229,255,.18)"; ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(ax,0);ctx.lineTo(ax,canvas.height);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,ay);ctx.lineTo(canvas.width,ay);ctx.stroke();
+}
+
+function drawRings(){
+  const gw=nodes[0]; if(!gw) return;
+  const [sx,sy]=w2s(gw.x,gw.y);
+  ctx.save(); ctx.setLineDash([3,5]);
+  ctx.strokeStyle="rgba(0,229,255,.07)"; ctx.lineWidth=1;
+  [1,2,5,10].forEach(r=>{
+    ctx.beginPath(); ctx.arc(sx,sy,r*scale,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle="rgba(0,229,255,.22)"; ctx.font="8px 'Share Tech Mono'";
+    ctx.fillText(r+"m",sx+r*scale+2,sy-2);
+  });
+  ctx.setLineDash([]); ctx.restore();
+}
+
+function drawNode(n){
+  const [sx,sy]=w2s(n.x,n.y), r=n.id===0?9:7, col=n.color;
+
+  // trail
+  if(showTrail && n.trail.length>1){
+    ctx.save(); ctx.lineWidth=1.5;
+    ctx.beginPath();
+    const [tx0,ty0]=w2s(n.trail[0][0],n.trail[0][1]); ctx.moveTo(tx0,ty0);
+    n.trail.slice(1).forEach(pt=>{ const [tx,ty]=w2s(pt[0],pt[1]); ctx.lineTo(tx,ty); });
+    ctx.lineTo(sx,sy);
+    ctx.strokeStyle=col+"50"; ctx.stroke(); ctx.restore();
+  }
+
+  // glow
+  const g=ctx.createRadialGradient(sx,sy,0,sx,sy,r*3.5);
+  g.addColorStop(0,col+"55"); g.addColorStop(1,col+"00");
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sx,sy,r*3.5,0,Math.PI*2); ctx.fill();
+
+  // circle
+  ctx.beginPath(); ctx.arc(sx,sy,r,0,Math.PI*2);
+  ctx.fillStyle=n.id===0?col:"#070b12"; ctx.fill();
+  ctx.strokeStyle=col; ctx.lineWidth=n.fresh?2.5:1.5; ctx.stroke();
+
+  // label
+  if(showLabel||n.id===0){
+    ctx.fillStyle=col; ctx.font="bold 11px 'Share Tech Mono'";
+    ctx.fillText(n.id===0?"GW":"N"+n.id,sx+r+4,sy+4);
+  }
+  if(scale>55){
+    ctx.fillStyle=col+"90"; ctx.font="8px 'Share Tech Mono'";
+    ctx.fillText(n.x.toFixed(2)+","+n.y.toFixed(2),sx+r+4,sy+14);
+  }
+}
+
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawGrid(); drawRings();
+  Object.values(nodes).forEach(drawNode);
+  // scale legend
+  const m=scale>=60?"1 m":scale>=20?"5 m":"10 m";
+  document.getElementById("scale-lbl").textContent=m;
+  requestAnimationFrame(render);
+}
+
+// ── Sidebar ──────────────────────────────────────────────────────────────────
+function rssiCol(r){ return r>=-70?"var(--ok)":r>=-85?"var(--warn)":"var(--danger)"; }
+function rssiPct(r){ return Math.max(0,Math.min(100,((r+120)/80)*100)); }
+
+function renderSidebar(){
+  const list=document.getElementById("list");
+  Object.values(nodes).sort((a,b)=>a.id-b.id).forEach(n=>{
+    let c=document.getElementById("nc"+n.id);
+    if(!c){ c=document.createElement("div"); c.className="card"; c.id="nc"+n.id; list.appendChild(c); }
+    c.className="card"+(n.fresh?" fresh":"");
+    c.style.borderColor=n.fresh?n.color:"";
+    c.style.boxShadow=n.fresh?"0 0 10px "+n.color+"33":"";
+    const age=Math.round(Date.now()/1000-n.last_seen);
+    c.innerHTML=`<div class="nid" style="color:${n.color}">${n.id===0?"GATEWAY":"NODE "+n.id}</div>
+<div class="coords">X:${n.x.toFixed(3)}m &nbsp;Y:${n.y.toFixed(3)}m &nbsp;Z:${n.z.toFixed(3)}m</div>
+<div class="meta"><span>RSSI ${n.rssi}dBm</span><span>SNR ${n.snr}dB</span><span>${age}s ago</span></div>
+<div class="bar"><div class="bar-fill" style="width:${rssiPct(n.rssi)}%;background:${rssiCol(n.rssi)}"></div></div>`;
+  });
+  list.querySelectorAll(".card").forEach(c=>{
+    if(!nodes[parseInt(c.id.replace("nc",""))]) c.remove();
+  });
+  const n=Object.keys(nodes).length;
+  document.getElementById("count").textContent=n+" node"+(n!==1?"s":"");
+}
+
+// ── Tooltip ──────────────────────────────────────────────────────────────────
+function setupTooltip(){
+  const tip=document.getElementById("tip");
+  canvas.addEventListener("mousemove",e=>{
+    const r=canvas.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+    let hit=null;
+    for(const n of Object.values(nodes)){
+      const [sx,sy]=w2s(n.x,n.y);
+      if(Math.hypot(mx-sx,my-sy)<14){ hit=n; break; }
+    }
+    if(hit){
+      tip.style.opacity="1";
+      tip.style.left=(e.clientX-canvas.getBoundingClientRect().left+14)+"px";
+      tip.style.top=(e.clientY-canvas.getBoundingClientRect().top-10)+"px";
+      tip.textContent=`Node ${hit.id===0?"0 (GATEWAY)":hit.id}\nX: ${hit.x.toFixed(4)} m\nY: ${hit.y.toFixed(4)} m\nZ: ${hit.z.toFixed(4)} m\nRSSI: ${hit.rssi} dBm\nSNR:  ${hit.snr} dB`;
+    } else tip.style.opacity="0";
+  });
+}
+
+// ── Interaction ──────────────────────────────────────────────────────────────
+function setupInteraction(){
+  canvas.addEventListener("mousedown",e=>{ drag=true; dragS=[e.clientX-panX,e.clientY-panY]; });
+  window.addEventListener("mouseup",()=>drag=false);
+  window.addEventListener("mousemove",e=>{ if(drag){ panX=e.clientX-dragS[0]; panY=e.clientY-dragS[1]; } });
+  canvas.addEventListener("wheel",e=>{
+    e.preventDefault();
+    scale=Math.min(400,Math.max(8,scale*(e.deltaY<0?1.12:.9)));
+  },{passive:false});
+}
+
+document.getElementById("b-center").addEventListener("click",()=>{ panX=0;panY=0;scale=80; });
+document.getElementById("b-trail").addEventListener("click",function(){ showTrail=!showTrail; this.classList.toggle("on",showTrail); });
+document.getElementById("b-label").addEventListener("click",function(){ showLabel=!showLabel; this.classList.toggle("on",showLabel); });
+document.getElementById("b-clear").addEventListener("click",()=>Object.values(nodes).forEach(n=>n.trail=[]));
+
+function resize(){ canvas.width=canvas.parentElement.clientWidth; canvas.height=canvas.parentElement.clientHeight; }
+
+window.addEventListener("load",()=>{
+  canvas=document.getElementById("c"); ctx=canvas.getContext("2d");
+  resize(); window.addEventListener("resize",resize);
+  setupInteraction(); setupTooltip(); render(); connect();
+});
+</script>
+</body>
+</html>

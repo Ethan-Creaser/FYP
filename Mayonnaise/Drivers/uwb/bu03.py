@@ -1,130 +1,176 @@
-# this file contains base and tag configuration for the uwb BU03 boards using UART
-# list of AT commands https://core-electronics.com.au/attachments/uploads/bu03-at-commands.pdf
-# BU03 documentation https://core-electronics.com.au/attachments/uploads/CE10222_bu03-kit_v1.1.0_specification.pdf
-# Core Electronics Written and Video Guide https://core-electronics.com.au/guides/sensors/getting-started-with-ultra-wideband-and-measuring-distances-arduino-and-pico-guide/#configuring-the-bu03-boards
-# author: Ashika
-# last updated: 23/02/26
-
 import struct
+import utime
+
+from machine import Pin, UART
 
 
-from machine import UART, Pin
-import time
+FRAME_HEADER = b"\xaa\x25\x01"
+FRAME_LEN = 37
+RESET_HOLD_MS = 500
+BOOT_WAIT_COLD_MS = 4000
+BOOT_WAIT_WARM_MS = 2000
+
 
 class BU03:
-    def __init__(self, uart_id=1, tx=17, rx=18,
-                 config_uart_id=2, config_tx=2, config_rx=1,
-                 reset_pin=15):
-        self.uart = UART(uart_id, baudrate=115200, tx=tx, rx=rx)
-        self.config_uart = UART(config_uart_id, baudrate=115200, tx=config_tx, rx=config_rx)
-        self.reset_pin = Pin(reset_pin, Pin.OUT)
-        self.reset_pin.value(1)
+    """
+    BU03 driver with explicit config/data UARTs and buffered frame parsing.
 
-    def reconfigure(self, id, role, channel=1, rate=1):
-        """
-        Configure the UWB module over the config UART pins, then reset and
-        switch back to the data UART pins ready for distance reads.
-        """
-        data_uart = self.uart
-        self.uart = self.config_uart
-        try:
-            self.configure(id, role, channel, rate)
-        finally:
-            self.uart = data_uart
+    Role meanings:
+      0 = tag
+      1 = anchor/base
+    """
 
-        self.reset()
+    def __init__(
+        self,
+        data_uart_id=1,
+        data_tx=17,
+        data_rx=18,
+        config_uart_id=2,
+        config_tx=2,
+        config_rx=1,
+        reset_pin=15,
+    ):
+        self.data_uart_id = data_uart_id
+        self.data_tx = data_tx
+        self.data_rx = data_rx
+        self.config_uart_id = config_uart_id
+        self.config_tx = config_tx
+        self.config_rx = config_rx
+        self.reset_pin = Pin(reset_pin, Pin.OUT, value=1)
+        self._buffer = bytearray()
+        self._init_uarts()
+        utime.sleep_ms(500)
 
-    def reset(self,sleep = 500):
+    def _init_uarts(self):
+        self.data_uart = UART(
+            self.data_uart_id,
+            baudrate=115200,
+            tx=self.data_tx,
+            rx=self.data_rx,
+            timeout=10,
+        )
+        self.config_uart = UART(
+            self.config_uart_id,
+            baudrate=115200,
+            tx=self.config_tx,
+            rx=self.config_rx,
+            timeout=10,
+        )
+
+    def _reset(self, warm=False):
         self.reset_pin.value(0)
-        time.sleep_ms(sleep)
+        utime.sleep_ms(RESET_HOLD_MS)
         self.reset_pin.value(1)
-        time.sleep_ms(sleep *2)  # wait for module to boot on data UART
+        utime.sleep_ms(BOOT_WAIT_WARM_MS if warm else BOOT_WAIT_COLD_MS)
+        self._init_uarts()
+        self._buffer = bytearray()
 
-    def send_at(self, cmd):
-        self.uart.write(cmd + '\r\n')
-        time.sleep(0.5)
-        if self.uart.any():
-            msg = self.uart.read()
-            print(msg)
+    def _send_at(self, command, delay_ms=1000):
+        self.config_uart.write(command + "\r\n")
+        utime.sleep_ms(delay_ms)
+        if self.config_uart.any():
+            response = self.config_uart.read()
+            print(response)
 
-    def configure(self, id, role, channel=1, rate=1):  # ID, Role (0 = tag, 1 = base station), Channel, Rate
-        # uart.write('AT') can be used to test if AT commands are sending successfully, refer to docs for more info
-        # send_at('AT+RESTORE') # factory reset
-        self.send_at(f'AT+SETCFG={id},{role},{channel},{rate}')
-        self.send_at('AT+SAVE')
-        self.send_at('AT+GETCFG')
+    def configure(self, node_id, role, channel=1, rate=1, warm=False):
+        self._send_at("AT+SETCFG={},{},{},{}".format(node_id, role, channel, rate))
+        self._send_at("AT+SAVE")
+        self._send_at("AT+GETCFG")
+        self._reset(warm=warm)
 
-    def verify_config(self, expected_id, expected_role):
-        self.send_at('AT+GETCFG')
+    def configure_warm(self, node_id, role, channel=1, rate=1):
+        self.configure(node_id, role, channel=channel, rate=rate, warm=True)
 
-    def read_distance(self, timeout_ms=200):
-        """Wait up to timeout_ms for data, then decode. Returns distances list or None."""
-        deadline = time.ticks_add(time.ticks_ms(), timeout_ms)
-        while time.ticks_diff(deadline, time.ticks_ms()) > 0:
-            if self.uart.any():
-                time.sleep_ms(20)  # let the full frame arrive
-                message = self.uart.read()
-                distances = self.decode_uwb_distances(message)
-                if distances is not None:
-                    return distances
-        return None
+    def reconfigure(self, node_id, role, channel=1, rate=1):
+        self.configure(node_id, role, channel=channel, rate=rate, warm=False)
 
-    ### UWB Distance Decoding Functions
+    def flush(self):
+        if self.data_uart.any():
+            self.data_uart.read()
+        self._buffer = bytearray()
 
     def decode_uwb_distances(self, data):
-        """
-        Decode UWB distance data from binary message
-        Returns list of distances in meters for each base station
-        """
-        if len(data) < 35:  # Minimum expected length
+        if data is None or len(data) < 35:
+            return None
+        if data[0:3] != FRAME_HEADER:
             return None
 
-        # Check for header pattern
-        if data[0:3] != b'\xaa%\x01':
-            return None
-
-        # Extract distance data (skip header, process 4-byte chunks)
         distances = []
-
-        # Starting from byte 3, read 4-byte chunks for each base station
-        for i in range(8):  # 8 base stations (0-7)
-            byte_offset = 3 + (i * 4)  # Each distance is 4 bytes
-            if byte_offset + 3 < len(data):
-                # Read as little-endian 32-bit integer
-                distance_raw = struct.unpack('<I', data[byte_offset:byte_offset+4])[0]
-                # Convert to meters
-                if distance_raw > 0:
-                    distance_meters = distance_raw / 1000.0
-                    distances.append(distance_meters)
-                else:
-                    distances.append(None)  # No signal/not visible
-            else:
-                distances.append(None)  # Base station not in data
-
+        for index in range(8):
+            offset = 3 + (index * 4)
+            if offset + 4 > len(data):
+                distances.append(None)
+                continue
+            raw = struct.unpack("<I", data[offset:offset + 4])[0]
+            distances.append((raw / 1000.0) if raw > 0 else None)
         return distances
 
-    def print_distances(self, distances):
-        """Print distances in a readable format"""
-        if distances is None:
-            print("Invalid data received")
-            return
+    def read_frame(self, timeout_ms=1500):
+        deadline = utime.ticks_add(utime.ticks_ms(), timeout_ms)
+        while utime.ticks_diff(deadline, utime.ticks_ms()) > 0:
+            if self.data_uart.any():
+                chunk = self.data_uart.read()
+                if chunk:
+                    self._buffer.extend(chunk)
 
-        print("Base Station Distances:")
-        for i, distance in enumerate(distances):
-            if distance is not None and distance > 0:
-                print(f"  BS{i}: {distance:.3f}m")
+            while len(self._buffer) >= 3 and self._buffer[0:3] != FRAME_HEADER:
+                self._buffer = self._buffer[1:]
+
+            if len(self._buffer) < FRAME_LEN:
+                utime.sleep_ms(10)
+                continue
+
+            next_header = None
+            for index in range(3, len(self._buffer) - 2):
+                if self._buffer[index:index + 3] == FRAME_HEADER:
+                    next_header = index
+                    break
+
+            if next_header is not None:
+                frame_end = next_header
+            elif self._buffer[FRAME_LEN - 1] == 0x55:
+                frame_end = FRAME_LEN
             else:
-                print(f"  BS{i}: Not visible")
-        print("-" * 30)
+                utime.sleep_ms(10)
+                continue
 
+            frame = bytes(self._buffer[:frame_end])
+            self._buffer = self._buffer[frame_end:]
+            decoded = self.decode_uwb_distances(frame)
+            if decoded is not None:
+                return decoded
 
-if __name__ == "__main__":
-    uwb = BU03()
-    uwb.configure(0, 1, 1, 1)  # ID=0, Role=Base Station, Channel=1, Rate=1
-    while True:
-        distances = uwb.read_distance()
-        if distances:
-            uwb.print_distances(distances)
-        else:
-            print("No distance data received")
-        time.sleep(2)
+        return None
+
+    def read_distance(self, timeout_ms=1500):
+        return self.read_frame(timeout_ms=timeout_ms)
+
+    def scan(self, frames=20, timeout_ms=1500):
+        best = {}
+        good_frames = 0
+        attempts = 0
+        max_attempts = max(frames * 4, frames + 1)
+
+        while good_frames < frames and attempts < max_attempts:
+            attempts += 1
+            decoded = self.read_frame(timeout_ms=timeout_ms)
+            if decoded is None:
+                continue
+
+            good_frames += 1
+            for slot, distance in enumerate(decoded):
+                if distance is None or distance <= 0:
+                    continue
+                current = best.get(slot)
+                if current is None or distance < current:
+                    best[slot] = distance
+
+        print("[BU03] scan {} good frames".format(good_frames))
+        return best
+
+    def scan_distances(self, frames=20, timeout_ms=1500):
+        raw = self.scan(frames=frames, timeout_ms=timeout_ms)
+        return sorted([distance for distance in raw.values() if distance and distance > 0])
+
+    def scan_with_slots(self, frames=5, timeout_ms=1500):
+        return self.scan(frames=frames, timeout_ms=timeout_ms)

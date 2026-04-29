@@ -14,11 +14,23 @@ try:
 except ImportError:
     import json
 
+try:
+    from version import BUILD_ID, BUILD_NAME, FIRMWARE_VERSION
+except ImportError:
+    FIRMWARE_VERSION = "0.0.0"
+    BUILD_ID = "unknown"
+    BUILD_NAME = "unknown"
+
 from Drivers.lora.transceiver import LoRaTransceiver
 from Drivers.oled.oled_class import OLED
 from Drivers.thermistor import Thermistor
 from Drivers.uwb.bu03 import BU03
-from node import EggNode
+try:
+    import node as node_module
+    EggNode = node_module.EggNode
+except Exception as exc:
+    print("NODE IMPORT FAILED:", exc)
+    raise
 
 
 LOG_WIDTH = 48
@@ -38,7 +50,9 @@ def print_item(label, value):
 DEFAULT_CONFIG = {
     "node_id": 0,
     "node_name": "egg_0",
-    "base_station_id": 0,
+    "device_label": "egg-00",
+    "node_role": "field_egg",
+    "ground_station_id": 0,
     "heartbeat_interval_ms": 30000,
     "sensor_interval_ms": 60000,
     "range_interval_ms": 10000,
@@ -48,6 +62,16 @@ DEFAULT_CONFIG = {
     "repair_window_ms": 15000,
     "seen_cache_ms": 300000,
     "default_ttl": 5,
+    "telemetry_enabled": True,
+    "localisation_enabled": True,
+    "localisation_boot_ms": 8000,
+    "localisation_announce_ms": 1500,
+    "localisation_turn_ms": 15000,
+    "localisation_frames": 10,
+    "localisation_max_members": 8,
+    "rover_localise_interval_ms": 10000,
+    "rover_localise_frames": 8,
+    "rover_min_anchors": 2,
     "lora_frequency": 433000000,
     "lora_tx_power": 10,
     "lora_bandwidth": 125000,
@@ -135,6 +159,9 @@ def main():
     sleep(0.1)
     print_section("EGG NODE BOOT")
     print_item("Serial", "connected")
+    print_item("Firmware", FIRMWARE_VERSION)
+    print_item("Build ID", BUILD_ID)
+    print_item("Build Name", BUILD_NAME)
 
     config = load_config()
 
@@ -147,9 +174,14 @@ def main():
     node = EggNode(config, radio, uwb=uwb, thermistor=thermistor, oled=oled)
 
     print_section("NODE STARTED")
+    print_item("Device", config["device_label"])
     print_item("Node", "{} ({})".format(config["node_name"], config["node_id"]))
-    print_item("Base station", config["base_station_id"])
+    print_item("Role", config["node_role"])
+    print_item("Ground station", config["ground_station_id"])
+    print_item("UWB ID", config["uwb_id"])
     print_item("Heartbeat", "{} ms".format(config["heartbeat_interval_ms"]))
+    print_item("Telemetry", "enabled" if config["telemetry_enabled"] else "disabled")
+    print_item("Localisation", "enabled" if config["localisation_enabled"] else "disabled")
     print_item("LoRa frequency", "{} Hz".format(config["lora_frequency"]))
 
     try:
