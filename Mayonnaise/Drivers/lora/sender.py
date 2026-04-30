@@ -1,6 +1,6 @@
 from machine import Pin, SPI
 from time import sleep
-from lora import ULoRa  # Ensure the ULoRa class is implemented and imported correctly
+from Drivers.lora.lora import ULoRa
 #EX_LED = Pin(15, Pin.OUT)
 # ============================================================================ 
 # Sender Test Example
