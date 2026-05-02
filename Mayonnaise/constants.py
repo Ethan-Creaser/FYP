@@ -1,0 +1,29 @@
+"""Core constants for the mesh restart spec."""
+
+# Timing (seconds)
+BEACON_INTERVAL = 30
+SUSPECT_TIMEOUT = 90
+LOST_TIMEOUT = 150
+
+# Routing / packets
+MAX_TTL = 6
+DEFAULT_ROUTE_TTL_MS = 300_000
+MAX_HOP_RETRIES = 3
+
+# IDs
+GROUND_STATION_ID = 99
+BROADCAST_ID = 0xFF
+
+# Packet kinds
+KIND_BEACON = 1
+KIND_RREQ = 2
+KIND_RREP = 3
+KIND_DATA = 4
+KIND_BCAST = 5
+KIND_ACK = 6
+KIND_RECOVERY = 7
+
+# Application IDs
+APP_LOCALISE = 1
+APP_THERM = 2
+APP_CTRL = 3
