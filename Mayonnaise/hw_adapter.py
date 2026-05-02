@@ -12,7 +12,7 @@ Note: this file will raise at import if MicroPython `machine` and driver modules
 On desktop simulation `node` should not call this adapter.
 """
 
-from typing import Optional
+# Avoid `typing` imports for MicroPython compatibility
 
 try:
     # MicroPython-specific imports; will fail on desktop

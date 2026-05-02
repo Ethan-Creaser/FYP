@@ -6,7 +6,7 @@ This module keeps the core logic intentionally small so it can be tested in-situ
 import time
 import json
 from collections import deque
-from typing import Dict, Tuple, Optional
+# avoid typing imports for MicroPython compatibility
 
 import constants
 import packets
@@ -23,11 +23,11 @@ class Node:
         self._seq = 1
         self.radio = None
         # duplicate suppression: (src, seq) -> timestamp
-        self._seen: Dict[Tuple[int, int], float] = {}
+        self._seen = {}
         # pending forwards: (orig_src, orig_seq) -> prev_hop
-        self.pending_forwards: Dict[Tuple[int, int], Optional[int]] = {}
+        self.pending_forwards = {}
         # outstanding sends (originated by this node)
-        self.outstanding: Dict[Tuple[int, int], float] = {}
+        self.outstanding = {}
 
     def next_seq(self) -> int:
         s = self._seq

@@ -6,7 +6,7 @@ Expected file per-node: topology_<node_id>.json with content:
 
 import os
 import json
-from typing import Optional, Set
+# avoid `typing` imports for MicroPython
 
 
 def load_allowed_neighbors(node_id: int, folder: str = ".") -> Optional[Set[int]]:

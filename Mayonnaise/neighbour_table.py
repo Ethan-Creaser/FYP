@@ -1,7 +1,7 @@
 """Simple neighbour table implementation used by the node state machine."""
 
 import time
-from typing import Dict, Optional
+# avoid 'typing' imports for MicroPython
 import constants
 
 
@@ -30,8 +30,8 @@ class NeighbourEntry:
 
 
 class NeighbourTable:
-    def __init__(self, allowlist: Optional[set] = None):
-        self._entries: Dict[int, NeighbourEntry] = {}
+    def __init__(self, allowlist=None):
+        self._entries = {}
         self.allowlist = set(allowlist) if allowlist else None
 
     def update(self, node_id: int, rssi: Optional[int] = None, snr: Optional[int] = None, hops_to_ground: Optional[int] = None):

@@ -1,7 +1,7 @@
 """Simple in-process simulator for the mesh core to validate packet flow and forwarding."""
 
 import time
-from typing import Dict, Optional
+# avoid typing imports for MicroPython compatibility
 
 from node import Node
 import topology

@@ -1,7 +1,7 @@
 """Simple route cache for next-hop routes."""
 
 import time
-from typing import Dict, Optional
+# avoid typing imports for MicroPython
 import constants
 
 
@@ -20,7 +20,7 @@ class RouteEntry:
 
 class RouteTable:
     def __init__(self):
-        self._routes: Dict[int, RouteEntry] = {}
+        self._routes = {}
 
     def set_route(self, dest: int, next_hop: int, hops: int):
         e = RouteEntry(dest, next_hop, hops)

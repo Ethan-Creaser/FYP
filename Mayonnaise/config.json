@@ -1,8 +1,8 @@
 {
-  "node_id": 7,
-  "node_name": "egg_7",
+  "node_id": 1,
+  "node_name": "egg_1",
   "ground_station_id": 99,
-  "use_hardware": false,
+  "use_hardware": true,
   "telemetry_enabled": true,
   "localisation_enabled": true,
 
