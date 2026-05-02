@@ -18,6 +18,10 @@ import json
 import packets
 import constants
 from node import Node
+try:
+    import random
+except Exception:
+    random = None
 
 
 def main():
@@ -51,7 +55,18 @@ def main():
         except Exception as e:
             print("hw_runner: could not start background poll:", e)
 
-    target = int(cfg.get("hw_test_target", constants.GROUND_STATION_ID))
+    # Determine peer target: if hw_test_target set in config use it.
+    # If not set and node_id is 1 or 2, default to the other peer.
+    tcfg = cfg.get("hw_test_target")
+    if tcfg is not None:
+        target = int(tcfg)
+    else:
+        if node_id == 1:
+            target = 2
+        elif node_id == 2:
+            target = 1
+        else:
+            target = constants.GROUND_STATION_ID
 
     # craft and send packet using node.next_seq() so we know the seq
     seq = node.next_seq()
@@ -61,7 +76,20 @@ def main():
     # mark outstanding so we can detect ACK
     node.outstanding[(node.node_id, seq)] = time.time()
 
-    print(f"hw_runner: sending test packet seq={seq} -> {target}")
+    # small jitter before sending to reduce collision chance
+    if random:
+        jitter = random.random() * 1.0
+    else:
+        jitter = (node_id % 5) * 0.1
+    print(f"hw_runner: sending test packet seq={seq} -> {target} after {jitter:.2f}s jitter")
+    try:
+        time.sleep(jitter)
+    except Exception:
+        # fallback for micropython without float sleep
+        try:
+            time.sleep_ms(int(jitter * 1000))
+        except Exception:
+            pass
     node.send_packet(pkt)
 
     # wait for ACK up to timeout
