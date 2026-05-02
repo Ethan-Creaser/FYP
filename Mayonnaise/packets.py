@@ -13,27 +13,23 @@ Envelope (bytes):
 Application payload (first bytes): app_id (1), subtype (1), data...
 """
 
-from __future__ import annotations
-import typing
-from dataclasses import dataclass
-from typing import Optional
 import constants
 
 
 MAX_PAYLOAD = 255
 
 
-@dataclass
 class Packet:
-    kind: int
-    src: int
-    dst: int
-    seq: int
-    ttl: int
-    payload: bytes = b""
-    version: int = 1
+    def __init__(self, kind, src, dst, seq, ttl, payload=b"", version=1):
+        self.kind = kind
+        self.src = src
+        self.dst = dst
+        self.seq = seq
+        self.ttl = ttl
+        self.payload = payload
+        self.version = version
 
-    def to_bytes(self) -> bytes:
+    def to_bytes(self):
         if len(self.payload) > MAX_PAYLOAD:
             raise ValueError("payload too large")
         header = bytes([
@@ -47,7 +43,7 @@ class Packet:
         return header + self.payload
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> "Packet":
+    def from_bytes(cls, data):
         if len(data) < 8:
             raise ValueError("packet too short")
         version = data[0]
@@ -59,31 +55,31 @@ class Packet:
         payload_len = data[7]
         if len(data) < 8 + payload_len:
             raise ValueError("invalid payload length")
-        payload = data[8 : 8 + payload_len]
-        return cls(kind=kind, src=src, dst=dst, seq=seq, ttl=ttl, payload=payload, version=version)
+        payload = data[8: 8 + payload_len]
+        return cls(kind, src, dst, seq, ttl, payload, version)
 
 
-def make_beacon(src: int, seq: int, hops_to_ground: Optional[int] = None) -> Packet:
+def make_beacon(src, seq, hops_to_ground=None):
     # payload: optional single byte hops_to_ground (255 = unknown)
     if hops_to_ground is None:
         payload = bytes([255])
     else:
         payload = bytes([hops_to_ground & 0xFF])
-    return Packet(kind=constants.KIND_BEACON, src=src, dst=constants.BROADCAST_ID, seq=seq, ttl=1, payload=payload)
+    return Packet(constants.KIND_BEACON, src, constants.BROADCAST_ID, seq, 1, payload)
 
 
-def make_data(src: int, dst: int, seq: int, ttl: int, app_id: int, subtype: int, data: bytes = b"") -> Packet:
+def make_data(src, dst, seq, ttl, app_id, subtype, data=b""):
     payload = bytes([app_id & 0xFF, subtype & 0xFF]) + data
-    return Packet(kind=constants.KIND_DATA, src=src, dst=dst, seq=seq, ttl=ttl, payload=payload)
+    return Packet(constants.KIND_DATA, src, dst, seq, ttl, payload)
 
 
-def make_ack(src: int, dst: int, orig_src: int, orig_seq: int) -> Packet:
+def make_ack(src, dst, orig_src, orig_seq):
     # ACK payload: orig_src (1), orig_seq (2)
     payload = bytes([orig_src & 0xFF]) + int(orig_seq).to_bytes(2, "big")
-    return Packet(kind=constants.KIND_ACK, src=src, dst=dst, seq=0, ttl=1, payload=payload)
+    return Packet(constants.KIND_ACK, src, dst, 0, 1, payload)
 
 
-def parse_app_payload(payload: bytes) -> typing.Tuple[int, int, bytes]:
+def parse_app_payload(payload):
     """Return (app_id, subtype, data_bytes)."""
     if len(payload) < 2:
         raise ValueError("app payload too short")
@@ -92,7 +88,7 @@ def parse_app_payload(payload: bytes) -> typing.Tuple[int, int, bytes]:
 
 if __name__ == "__main__":
     # quick self-test
-    p = make_data(src=1, dst=5, seq=123, ttl=6, app_id=constants.APP_LOCALISE, subtype=1, data=b"hi")
+    p = make_data(1, 5, 123, 6, constants.APP_LOCALISE, 1, b"hi")
     b = p.to_bytes()
     p2 = Packet.from_bytes(b)
     assert p2.src == 1 and p2.dst == 5 and p2.seq == 123

@@ -1,6 +1,5 @@
 """Simple in-process simulator for the mesh core to validate packet flow and forwarding."""
 
-from __future__ import annotations
 import time
 from typing import Dict, Optional
 

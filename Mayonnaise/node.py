@@ -3,7 +3,6 @@
 This module keeps the core logic intentionally small so it can be tested in-situ with `sim_harness.py`.
 """
 
-from __future__ import annotations
 import time
 import json
 from collections import deque
