@@ -210,7 +210,9 @@ def phase_range(uwb, radio, node_id, my_slot, slots):
 
     if not is_tag:
         log("  Anchor ready — waiting for tag to range us")
-        return
+        # Stay alive so UWB hardware keeps listening and BLE stays connected.
+        while True:
+            utime.sleep_ms(1000)
 
     # Tag: range repeatedly
     while True:
