@@ -7,8 +7,8 @@ import utime
 from machine import Pin
 from time import sleep
 from neopixel import NeoPixel
-pin = Pin(38, Pin.OUT)                          # Pin number for v1 of the above DevKitC, use pin 38 for v1.1
-np = NeoPixel(pin, 1)  
+pin = Pin(38, Pin.OUT)
+np = NeoPixel(pin, 1)
 
 try:
     import ujson as json
@@ -51,9 +51,7 @@ def print_item(label, value):
 
 
 DEFAULT_CONFIG = {
-    "node_id": 0,
-    "node_name": "egg_0",
-    "device_label": "egg-00",
+    # node_id, uwb_id, node_name, device_label — set via identity.bin only
     "node_role": "field_egg",
     "ground_station_id": 0,
     "heartbeat_interval_ms": 30000,
@@ -79,13 +77,11 @@ DEFAULT_CONFIG = {
     "lora_tx_power": 10,
     "lora_bandwidth": 125000,
     "lora_spreading_factor": 9,
-    "uwb_id": 0,
-    "uwb_role": 0,
     "uwb_channel": 1,
     "uwb_rate": 1,
     "thermistor_pin": None,
     "wifi_enabled": False,
-    "wifi_mode": "sta",      # "sta" = join existing network, "ap" = create hotspot
+    "wifi_mode": "sta",
     "wifi_ssid": None,
     "wifi_password": "",
     "wifi_port": 80,
@@ -102,6 +98,39 @@ def load_config(path="config.json"):
         print_item("Config", "loaded from {}".format(path))
     except Exception as exc:
         print_item("Config", "using defaults ({})".format(exc))
+    return config
+
+
+def apply_identity(config, path="identity.bin"):
+    """
+    Load per-device identity from a 3-byte binary file:
+      byte 0: magic 0xE9  (validates the file is ours)
+      byte 1: node_id
+      byte 2: uwb_id
+
+    .bin is not uploaded by the MicroPython project sync tool, so this file
+    survives code deployments and prevents accidental ID collisions.
+
+    Write once per device using hardcode_egg_id.py.
+    Node will halt on boot if this file is missing or corrupt.
+    """
+    MAGIC = 0xE9
+    try:
+        with open(path, "rb") as handle:
+            data = handle.read(3)
+    except OSError:
+        raise RuntimeError("identity.bin missing — run hardcode_egg_id.py on this device")
+
+    if len(data) != 3 or data[0] != MAGIC:
+        raise RuntimeError("identity.bin corrupt — run hardcode_egg_id.py on this device")
+
+    node_id = data[1]
+    uwb_id  = data[2]
+    config["node_id"]      = node_id
+    config["uwb_id"]       = uwb_id
+    config["node_name"]    = "egg_{}".format(node_id)
+    config["device_label"] = "egg-{:02d}".format(node_id)
+    print_item("Identity", "node_id={} uwb_id={}".format(node_id, uwb_id))
     return config
 
 
@@ -123,7 +152,6 @@ def make_radio(config, oled=None):
         "signal_bandwidth": config["lora_bandwidth"],
         "spreading_factor": config["lora_spreading_factor"],
     }
-
     try:
         radio = LoRaTransceiver(parameters=parameters)
         print_item("LoRa", "initialised")
@@ -139,7 +167,11 @@ def make_radio(config, oled=None):
 
 def make_uwb(config):
     try:
-        uwb = BU03()
+        uwb = BU03(
+            data_uart_id=1, data_tx=17, data_rx=18,
+            config_uart_id=2, config_tx=2, config_rx=1,
+            reset_pin=15,
+        )
         print_item("UWB", "initialised")
         return uwb
     except Exception as exc:
@@ -163,7 +195,6 @@ def make_wifi(config, oled=None):
             try:
                 oled.display_text("WiFi {}\n{}\nport {}".format(
                     mode.upper(), wl.ip, port))
-                import utime
                 utime.sleep_ms(3000)
             except Exception:
                 pass
@@ -186,8 +217,7 @@ def make_bt(config):
         except Exception as exc:
             print_item("Bluetooth", "attempt {} failed ({})".format(attempt, exc))
             if attempt < 3:
-                import utime as _utime
-                _utime.sleep_ms(500)
+                utime.sleep_ms(500)
     return None
 
 
@@ -196,7 +226,6 @@ def make_thermistor(config):
     if pin is None:
         print_item("Thermistor", "disabled")
         return None
-
     try:
         thermistor = Thermistor(pin)
         print_item("Thermistor", "initialised on pin {}".format(pin))
@@ -207,7 +236,7 @@ def make_thermistor(config):
 
 
 def main():
-    np[0] = (255,0,0) # red
+    np[0] = (255, 0, 0)
     np.write()
     sleep(0.1)
     print_section("EGG NODE BOOT")
@@ -217,14 +246,15 @@ def main():
     print_item("Build Name", BUILD_NAME)
 
     config = load_config()
+    apply_identity(config)
 
     print_section("HARDWARE STARTUP")
-    oled = make_oled()
-    radio = make_radio(config, oled)
-    uwb = make_uwb(config)
+    oled       = make_oled()
+    radio      = make_radio(config, oled)
+    uwb        = make_uwb(config)
     thermistor = make_thermistor(config)
-    wifi = make_wifi(config, oled)
-    bt   = make_bt(config)
+    wifi       = make_wifi(config, oled)
+    bt         = make_bt(config)
 
     node = EggNode(config, radio, uwb=uwb, thermistor=thermistor, oled=oled)
     if wifi is not None:
@@ -233,15 +263,16 @@ def main():
         node.logger.add_output(bt)
 
     print_section("NODE STARTED")
-    print_item("Device", config["device_label"])
-    print_item("Node", "{} ({})".format(config["node_name"], config["node_id"]))
-    print_item("Role", config["node_role"])
-    print_item("Ground station", config["ground_station_id"])
-    print_item("UWB ID", config["uwb_id"])
-    print_item("Heartbeat", "{} ms".format(config["heartbeat_interval_ms"]))
-    print_item("Telemetry", "enabled" if config["telemetry_enabled"] else "disabled")
-    print_item("Localisation", "enabled" if config["localisation_enabled"] else "disabled")
-    print_item("LoRa frequency", "{} Hz".format(config["lora_frequency"]))
+    print_item("Device",        config["device_label"])
+    print_item("Node",          "{} ({})".format(config["node_name"], config["node_id"]))
+    print_item("Role",          config["node_role"])
+    print_item("Ground station",config["ground_station_id"])
+    print_item("UWB ID",        config["uwb_id"])
+    print_item("Heartbeat",     "{} ms".format(config["heartbeat_interval_ms"]))
+    print_item("Telemetry",     "enabled" if config["telemetry_enabled"] else "disabled")
+    localisation_mode = ("pc-centralised" if config.get("localisation_pc_mode") else "on-device") if config["localisation_enabled"] else "disabled"
+    print_item("Localisation",  localisation_mode)
+    print_item("LoRa frequency","{} Hz".format(config["lora_frequency"]))
 
     try:
         while True:
@@ -252,14 +283,12 @@ def main():
                 bt.poll()
             alive, _, _ = node.neighbours.summary()
             if alive >= 2:
-                np[0] = (0,255,0) # green
-                np.write()
+                np[0] = (0, 255, 0)
             elif alive >= 1:
-                np[0] = (255,255,0) # yellow
-                np.write()
+                np[0] = (255, 255, 0)
             else:
-                np[0] = (255,0,0) # red
-                np.write()
+                np[0] = (255, 0, 0)
+            np.write()
             utime.sleep_ms(50)
     except KeyboardInterrupt:
         print_section("NODE STOPPED")
