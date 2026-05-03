@@ -130,7 +130,7 @@ class HardwareRadio:
             except Exception:
                 pass
             # from_id isn't known at radio-level; node will parse pkt.src
-            self.node.receive_raw(payload, from_id=None, rssi=rssi, snr=snr)
+            self.node.receive_raw(payload, rssi=rssi, snr=snr)
 
     def start_background(self, timeout_ms: int = 500):
         if _thread is None:

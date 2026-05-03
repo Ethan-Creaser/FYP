@@ -90,14 +90,19 @@ def main():
         # production: no periodic hardware test in main.py (use Debug/hw_runner.py)
 
     beacon_interval = getattr(constants, "BEACON_INTERVAL", 30)
+    beacon_jitter   = getattr(constants, "BEACON_JITTER", 5)
     next_beacon = time.time()
 
     try:
         while True:
             now = time.time()
             if now >= next_beacon:
-                node.send_beacon()
-                jitter = (random.random() - 0.5) * 0.2 * beacon_interval
+                # Beacon suppression: if we transmitted anything within the last
+                # beacon_interval seconds, neighbours already know we are alive.
+                # Skip this beacon and let the timer fire again next cycle.
+                if now - node._last_tx_time >= beacon_interval:
+                    node.send_beacon()
+                jitter = (random.random() - 0.5) * 2 * beacon_jitter
                 next_beacon = now + beacon_interval + jitter
 
             # If radio exists and no background thread, poll it here (blocking short)

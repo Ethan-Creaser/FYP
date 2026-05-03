@@ -8,6 +8,10 @@ try:
 except Exception:
     import time
 
+import sys
+if "/" not in sys.path:
+    sys.path.insert(0, "/")
+
 import json
 import packets
 import constants
