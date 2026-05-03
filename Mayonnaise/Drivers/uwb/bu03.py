@@ -8,7 +8,7 @@ FRAME_HEADER = b"\xaa\x25\x01"
 FRAME_LEN = 37
 RESET_HOLD_MS = 500
 BOOT_WAIT_COLD_MS = 4000
-BOOT_WAIT_WARM_MS = 2000
+BOOT_WAIT_WARM_MS = 3000
 
 
 class BU03:
@@ -42,6 +42,16 @@ class BU03:
         utime.sleep_ms(500)
 
     def _init_uarts(self):
+        # Deinit before reinit to release hardware resources — omitting this
+        # causes the ESP32S3 UART driver to exhaust resources after ~3 resets.
+        try:
+            self.data_uart.deinit()
+        except Exception:
+            pass
+        try:
+            self.config_uart.deinit()
+        except Exception:
+            pass
         self.data_uart = UART(
             self.data_uart_id,
             baudrate=115200,
@@ -71,10 +81,22 @@ class BU03:
         if self.config_uart.any():
             response = self.config_uart.read()
             print(response)
+            return response
+        return b""
+
+    def _save(self, retries=3):
+        for attempt in range(retries):
+            resp = self._send_at("AT+SAVE", delay_ms=1500)
+            if b"ERR" not in resp:
+                return True
+            print("[BU03] AT+SAVE ERR (attempt {}/{}) retrying...".format(attempt + 1, retries))
+            utime.sleep_ms(500)
+        print("[BU03] AT+SAVE failed after {} attempts".format(retries))
+        return False
 
     def configure(self, node_id, role, channel=1, rate=1, warm=False):
         self._send_at("AT+SETCFG={},{},{},{}".format(node_id, role, channel, rate))
-        self._send_at("AT+SAVE")
+        self._save()
         self._send_at("AT+GETCFG")
         self._reset(warm=warm)
 

@@ -34,6 +34,7 @@ Usage
 """
 
 import utime
+import machine
 from machine import Pin, SPI
 from Drivers.lora.lora import (
     ULoRa,
@@ -63,7 +64,7 @@ RX_TIMEOUT_US    = 2_000_000   # 2 s
 # Zero out residual ISR-entry latency.  Measure at a known reference distance:
 #   CALIBRATION_US = measured_ToF_us - (actual_distance_m / 300)
 # Set to 0 until you have a reference measurement.
-CALIBRATION_US = 6252
+CALIBRATION_US = 0
 
 # ── DIO0 GPIO polling ────────────────────────────────────────────────────────
 # Poll the DIO0 pin directly instead of going through SPI or using soft IRQ.
@@ -74,12 +75,25 @@ _dio0_pin = None   # set by _make_lora
 
 
 def _wait_dio0(timeout_us=2_000_000):
-    """Spin until DIO0 goes high.  Returns ticks_us() at the rising edge, or None."""
+    """
+    Spin until DIO0 goes high.  Returns ticks_us() at the rising edge, or None.
+
+    machine.disable_irq() wraps each (pin-read + ticks_us) pair so FreeRTOS
+    cannot context-switch between sampling the GPIO and recording the time.
+    Interrupts are re-enabled immediately after each iteration, so the
+    worst-case interrupt-disabled window is one tight loop body (~few µs).
+    """
     deadline = utime.ticks_add(utime.ticks_us(), timeout_us)
-    while not _dio0_pin.value():
+    pin = _dio0_pin   # local lookup is faster inside the loop
+    while True:
+        state = machine.disable_irq()
+        if pin.value():
+            t = utime.ticks_us()
+            machine.enable_irq(state)
+            return t
+        machine.enable_irq(state)
         if utime.ticks_diff(deadline, utime.ticks_us()) <= 0:
             return None
-    return utime.ticks_us()
 
 # ── Low-level timed TX / RX ───────────────────────────────────────────────────
 

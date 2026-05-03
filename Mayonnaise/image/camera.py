@@ -43,8 +43,7 @@ def print_item(label, value):
 
 
 DEFAULT_CONFIG = {
-    "node_id": 0,
-    "node_name": "camera_0",
+    # node_id, uwb_id, node_name — set via identity.bin only
     "base_station_id": 0,
     "heartbeat_interval_ms": 30000,
     "sensor_interval_ms": 60000,
@@ -59,14 +58,12 @@ DEFAULT_CONFIG = {
     "lora_tx_power": 10,
     "lora_bandwidth": 125000,
     "lora_spreading_factor": 9,
-    "uwb_id": 0,
-    "uwb_role": 0,
     "uwb_channel": 1,
     "uwb_rate": 1,
     "thermistor_pin": None,
-    "image_file": "image.bin",  # .bin file to send
-    "image_dst": None,          # None = broadcast, int = unicast to that node_id
-    "image_send_delay_ms": 5000, # ms after boot before sending
+    "image_file": "image.bin",
+    "image_dst": None,
+    "image_send_delay_ms": 5000,
 }
 
 
@@ -79,6 +76,26 @@ def load_config(path="config.json"):
         print_item("Config", "loaded from {}".format(path))
     except Exception as exc:
         print_item("Config", "using defaults ({})".format(exc))
+    return config
+
+
+def apply_identity(config, path="identity.bin"):
+    MAGIC = 0xE9
+    try:
+        with open(path, "rb") as handle:
+            data = handle.read(3)
+    except OSError:
+        raise RuntimeError("identity.bin missing — run hardcode_egg_id.py on this device")
+
+    if len(data) != 3 or data[0] != MAGIC:
+        raise RuntimeError("identity.bin corrupt — run hardcode_egg_id.py on this device")
+
+    node_id = data[1]
+    uwb_id  = data[2]
+    config["node_id"]   = node_id
+    config["uwb_id"]    = uwb_id
+    config["node_name"] = "camera_{}".format(node_id)
+    print_item("Identity", "node_id={} uwb_id={}".format(node_id, uwb_id))
     return config
 
 
@@ -115,7 +132,11 @@ def make_radio(config, oled=None):
 
 def make_uwb(config):
     try:
-        uwb = BU03()
+        uwb = BU03(
+            data_uart_id=1, data_tx=17, data_rx=18,
+            config_uart_id=2, config_tx=2, config_rx=1,
+            reset_pin=15,
+        )
         print_item("UWB", "initialised")
         return uwb
     except Exception as exc:
@@ -145,6 +166,7 @@ def main():
     print_item("Serial", "connected")
 
     config = load_config()
+    apply_identity(config)
 
     print_section("HARDWARE STARTUP")
     oled = make_oled()

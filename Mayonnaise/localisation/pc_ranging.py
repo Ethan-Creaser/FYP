@@ -32,8 +32,8 @@ class PCRangingController:
     STATE_IDLE    = "idle"
     STATE_RANGING = "ranging"
 
-    # Stub is_complete / state so EggNode code that checks these still works.
-    is_complete = False
+    # Stub so EggNode code that checks these still works.
+    is_complete = False  # overridden to True after first start()
 
     def __init__(
         self,
@@ -82,6 +82,13 @@ class PCRangingController:
     # ------------------------------------------------------------------ #
 
     def start(self, now, reason="boot"):
+        # If already running (repair trigger), don't reconfigure UWB — just
+        # let the existing ranging loop continue.  Repair in PC mode means
+        # the PC re-solves when new distances arrive; there's nothing to restart.
+        if self._next_due is not None and reason != "boot":
+            self.logger.event("PC RANGING SKIP START", [("Reason", "already running")])
+            return
+
         self.logger.event("PC RANGING START", [
             ("Reason", reason), ("Node", self.node_id),
         ])
@@ -91,6 +98,8 @@ class PCRangingController:
         stagger_ms = self.node_id * self._round_ms
         self._next_due = utime.ticks_add(utime.ticks_ms(), stagger_ms)
         self.state = self.STATE_IDLE
+        # Mark complete so repair logic doesn't treat this as a failed localisation.
+        self.is_complete = True
 
     def advance(self, now):
         if self._next_due is None:

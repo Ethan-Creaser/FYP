@@ -54,6 +54,8 @@ class NeighbourTable:
                 record["status"] = "alive"
 
             if record["status"] != old_status:
+                print("[NeighbourTable] node {} {} -> {}".format(
+                    record["node_id"], old_status, record["status"]))
                 changed = True
 
         return changed
