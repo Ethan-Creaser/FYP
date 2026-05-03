@@ -4,22 +4,25 @@ Expected file per-node: topology_<node_id>.json with content:
 { "allowed_neighbors": [2,3] }
 """
 
-import os
+try:
+    import uos as os
+except ImportError:
+    import os
 import json
-# avoid `typing` imports for MicroPython
 
 
-def load_allowed_neighbors(node_id: int, folder: str = ".") -> Optional[Set[int]]:
-    fn = os.path.join(folder, f"topology_{node_id}.json")
-    if not os.path.exists(fn):
+def load_allowed_neighbors(node_id, folder="."):
+    fn = folder + "/topology_" + str(node_id) + ".json"
+    try:
+        with open(fn, "r") as f:
+            data = json.load(f)
+    except Exception:
         return None
-    with open(fn, "r", encoding="utf-8") as f:
-        data = json.load(f)
     arr = data.get("allowed_neighbors") or []
     return set(int(x) for x in arr)
 
 
-def load_all_topologies(folder: str = "."):
+def load_all_topologies(folder="."):
     """Return dict node_id -> set(allowed_neighbors) for all topology files found."""
     res = {}
     for name in os.listdir(folder):

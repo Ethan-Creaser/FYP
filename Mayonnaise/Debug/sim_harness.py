@@ -11,11 +11,11 @@ import topology
 
 
 class SimNetwork:
-    def __init__(self, topology_map: Dict[int, Optional[set]]):
+    def __init__(self, topology_map):
         # topology_map: node_id -> set(allowed neighbour ids) or None
         # interpret None as broadcast-to-all (not used in tests)
         self.topology = {k: (v or set()) for k, v in topology_map.items()}
-        self.nodes: Dict[int, Node] = {}
+        self.nodes = {}
 
     def register_node(self, node: Node):
         self.nodes[node.node_id] = node

@@ -6,7 +6,7 @@ import constants
 
 
 class NeighbourEntry:
-    def __init__(self, node_id: int):
+    def __init__(self, node_id):
         self.node_id = node_id
         self.last_seen = time.time()
         self.rssi = None
@@ -15,7 +15,7 @@ class NeighbourEntry:
         self.hops_to_ground = None
         self.is_alive = True
 
-    def touch(self, rssi: Optional[int] = None, snr: Optional[int] = None, hops_to_ground: Optional[int] = None):
+    def touch(self, rssi=None, snr=None, hops_to_ground=None):
         self.last_seen = time.time()
         if rssi is not None:
             self.rssi = rssi
@@ -25,7 +25,7 @@ class NeighbourEntry:
             self.hops_to_ground = hops_to_ground
         self.is_alive = True
 
-    def age_seconds(self) -> float:
+    def age_seconds(self):
         return time.time() - self.last_seen
 
 
@@ -34,7 +34,7 @@ class NeighbourTable:
         self._entries = {}
         self.allowlist = set(allowlist) if allowlist else None
 
-    def update(self, node_id: int, rssi: Optional[int] = None, snr: Optional[int] = None, hops_to_ground: Optional[int] = None):
+    def update(self, node_id, rssi=None, snr=None, hops_to_ground=None):
         if self.allowlist is not None and node_id not in self.allowlist:
             # ignore links not in allowlist when testing
             return
@@ -60,7 +60,7 @@ class NeighbourTable:
                 res.append(e)
         return res
 
-    def get(self, node_id: int) -> Optional[NeighbourEntry]:
+    def get(self, node_id):
         return self._entries.get(node_id)
 
     def prune_stale(self):

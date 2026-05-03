@@ -5,7 +5,6 @@ This module keeps the core logic intentionally small so it can be tested in-situ
 
 import time
 import json
-from collections import deque
 # avoid typing imports for MicroPython compatibility
 
 import constants
@@ -15,7 +14,7 @@ from route_table import RouteTable
 
 
 class Node:
-    def __init__(self, node_id: int, allowlist: Optional[set] = None):
+    def __init__(self, node_id, allowlist=None):
         self.node_id = node_id
         self.neighbours = NeighbourTable(allowlist=allowlist)
         self.routes = RouteTable()
@@ -30,7 +29,7 @@ class Node:
         # outstanding sends (originated by this node)
         self.outstanding = {}
 
-    def next_seq(self) -> int:
+    def next_seq(self):
         s = self._seq
         self._seq = (self._seq + 1) & 0xFFFF
         if self._seq == 0:
@@ -38,7 +37,7 @@ class Node:
         return s
 
     # --- network glue ---
-    def send_packet(self, pkt: packets.Packet, to_next_hop: Optional[int] = None):
+    def send_packet(self, pkt, to_next_hop=None):
         # Log higher-level send intent
         try:
             print(f"[node {self.node_id}] send_packet src={pkt.src} dst={pkt.dst} seq={pkt.seq} kind={getattr(pkt, 'kind', '?')} to_next_hop={to_next_hop}")
@@ -105,7 +104,7 @@ class Node:
             self.send_packet(pkt)
 
     # --- receiving / handling ---
-    def receive_raw(self, data: bytes, from_id: Optional[int], rssi: Optional[int] = None, snr: Optional[int] = None):
+    def receive_raw(self, data, from_id, rssi=None, snr=None):
         # physical RX diagnostics
         try:
             print(f"[node {self.node_id}] RX physical from={from_id} len={len(data)} rssi={rssi} snr={snr}")
@@ -137,7 +136,7 @@ class Node:
         # debug logging removed from production; RX vitals are handled by display
         self.handle_packet(pkt, from_id)
 
-    def _seen_check(self, pkt: packets.Packet) -> bool:
+    def _seen_check(self, pkt):
         key = (pkt.src, pkt.seq)
         if key in self._seen:
             return True
@@ -150,7 +149,7 @@ class Node:
                 del self._seen[k]
         return False
 
-    def handle_packet(self, pkt: packets.Packet, from_id: int):
+    def handle_packet(self, pkt, from_id):
         # duplicate suppression for RREQ/DATA/BCAST
         if pkt.kind in (constants.KIND_DATA, constants.KIND_BCAST, constants.KIND_RREQ):
             if self._seen_check(pkt):
@@ -232,7 +231,7 @@ class Node:
 
         # other kinds: not implemented yet
 
-    def _handle_ack(self, orig_src: int, orig_seq: int, from_id: int):
+    def _handle_ack(self, orig_src, orig_seq, from_id):
         key = (orig_src, orig_seq)
         # if we originated the packet
         if orig_src == self.node_id and key in self.outstanding:
@@ -261,7 +260,7 @@ class Node:
         ack = packets.make_ack(src=self.node_id, dst=ack_dst, orig_src=orig_src, orig_seq=orig_seq)
         self.send_packet(ack, to_next_hop=(prev if self.network is not None else None))
 
-    def attach_hardware_from_config(self, config_path: str = "config.json") -> bool:
+    def attach_hardware_from_config(self, config_path="config.json"):
         """Attach a HardwareRadio using the provided JSON config file.
 
         Returns True if the hardware adapter was attached, False otherwise.

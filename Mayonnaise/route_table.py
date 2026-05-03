@@ -6,7 +6,7 @@ import constants
 
 
 class RouteEntry:
-    def __init__(self, dest: int, next_hop: int, hops: int):
+    def __init__(self, dest, next_hop, hops):
         self.dest = dest
         self.next_hop = next_hop
         self.hops = hops
@@ -26,7 +26,7 @@ class RouteTable:
         e = RouteEntry(dest, next_hop, hops)
         self._routes[dest] = e
 
-    def get_next_hop(self, dest: int) -> Optional[int]:
+    def get_next_hop(self, dest):
         e = self._routes.get(dest)
         if not e:
             return None
