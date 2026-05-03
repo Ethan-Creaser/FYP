@@ -22,6 +22,7 @@ class Node:
         self.network = None  # set by SimNetwork.register_node
         self._seq = 1
         self.radio = None
+        self.start_time = time.time()
         # duplicate suppression: (src, seq) -> timestamp
         self._seen = {}
         # pending forwards: (orig_src, orig_seq) -> prev_hop
@@ -38,16 +39,27 @@ class Node:
 
     # --- network glue ---
     def send_packet(self, pkt: packets.Packet, to_next_hop: Optional[int] = None):
+        # Log higher-level send intent
+        try:
+            print(f"[node {self.node_id}] send_packet src={pkt.src} dst={pkt.dst} seq={pkt.seq} kind={getattr(pkt, 'kind', '?')} to_next_hop={to_next_hop}")
+        except Exception:
+            pass
         b = pkt.to_bytes()
         if self.network is not None:
             if to_next_hop is None:
                 # flood to all neighbours
+                print(f"[node {self.node_id}] NET-FLOOD pkt src={pkt.src} dst={pkt.dst} seq={pkt.seq}")
                 self.network.deliver(b, from_id=self.node_id)
             else:
+                print(f"[node {self.node_id}] NET-SEND_DIRECT to {to_next_hop} pkt src={pkt.src} dst={pkt.dst} seq={pkt.seq}")
                 self.network.send_direct(b, from_id=self.node_id, to_id=to_next_hop)
             return
         # hardware mode: send via radio if available (physical TX is always broadcast)
         if getattr(self, "radio", None) is not None:
+            try:
+                print(f"[node {self.node_id}] RADIO TX pkt src={pkt.src} dst={pkt.dst} seq={pkt.seq} len={len(b)}")
+            except Exception:
+                pass
             self.radio.send(b)
             return
         # fallback (debug)
@@ -57,6 +69,7 @@ class Node:
         seq = self.next_seq()
         # hops_to_ground unknown (255)
         pkt = packets.make_beacon(src=self.node_id, seq=seq, hops_to_ground=None)
+        print(f"[node {self.node_id}] send_beacon seq={seq}")
         self.send_packet(pkt)
 
     def send_data(self, dst: int, app_id: int, subtype: int, data: bytes = b"", ttl: int = constants.MAX_TTL):
@@ -64,8 +77,13 @@ class Node:
         pkt = packets.make_data(src=self.node_id, dst=dst, seq=seq, ttl=ttl, app_id=app_id, subtype=subtype, data=data)
         # mark as outstanding so origin can detect final ACK
         self.outstanding[(self.node_id, seq)] = time.time()
+        # production: no-op for CSV logging (debug logger moved to Debug/)
         # try route first
         next_hop = self.routes.get_next_hop(dst)
+        try:
+            print(f"[node {self.node_id}] orig SEND DATA dst={dst} seq={seq} ttl={ttl} next_hop={next_hop}")
+        except Exception:
+            pass
         if next_hop:
             self.send_packet(pkt, to_next_hop=next_hop)
             # record that we forwarded this packet (prev_hop is None because we originated)
@@ -76,10 +94,16 @@ class Node:
 
     # --- receiving / handling ---
     def receive_raw(self, data: bytes, from_id: Optional[int], rssi: Optional[int] = None, snr: Optional[int] = None):
+        # physical RX diagnostics
+        try:
+            print(f"[node {self.node_id}] RX physical from={from_id} len={len(data)} rssi={rssi} snr={snr}")
+        except Exception:
+            pass
         try:
             pkt = packets.Packet.from_bytes(data)
         except Exception as e:
             print(f"[node {self.node_id}] bad packet from {from_id}: {e}")
+            # debug logging removed from production; bad RX reported via prints
             return
         # update neighbour table using logical packet source when possible
         try:
@@ -88,6 +112,17 @@ class Node:
             # fall back to physical identifier
             if from_id is not None:
                 self.neighbours.update(from_id, rssi=rssi, snr=snr)
+        # update display with last rx vitals if attached
+        try:
+            if getattr(self, "display", None):
+                try:
+                    self.display.update_on_rx(rssi=rssi, snr=snr, from_id=from_id, src=pkt.src)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # log the received packet at radio level
+        # debug logging removed from production; RX vitals are handled by display
         self.handle_packet(pkt, from_id)
 
     def _seen_check(self, pkt: packets.Packet) -> bool:
@@ -134,6 +169,10 @@ class Node:
                 print(f"[node {self.node_id}] DATA from {pkt.src} seq={pkt.seq} app={app_id} subtype={subtype} body={body}")
                 # send ACK back to the neighbour we received from (prefer physical from_id if present)
                 ack_dst = from_id if from_id is not None else pkt.src
+                try:
+                    print(f"[node {self.node_id}] sending ACK for orig_src={pkt.src} orig_seq={pkt.seq} dst={ack_dst} via_from_id={from_id}")
+                except Exception:
+                    pass
                 ack = packets.make_ack(src=self.node_id, dst=ack_dst, orig_src=pkt.src, orig_seq=pkt.seq)
                 # only request direct send in sim when from_id available
                 self.send_packet(ack, to_next_hop=(from_id if self.network and from_id is not None else None))
@@ -148,6 +187,10 @@ class Node:
                 return
             pkt.ttl -= 1
             next_hop = self.routes.get_next_hop(pkt.dst)
+            try:
+                print(f"[node {self.node_id}] forward pkt src={pkt.src} dst={pkt.dst} seq={pkt.seq} ttl={pkt.ttl} prev_hop={prev_hop} next_hop={next_hop}")
+            except Exception:
+                pass
             if next_hop and self.network:
                 self.send_packet(pkt, to_next_hop=next_hop)
             else:
@@ -170,6 +213,13 @@ class Node:
         # if we originated the packet
         if orig_src == self.node_id and key in self.outstanding:
             print(f"[node {self.node_id}] delivery ACK received for seq={orig_seq}")
+            # update display if attached
+            try:
+                if getattr(self, "display", None):
+                    self.display.update_on_ack(orig_seq)
+            except Exception:
+                pass
+            # production: ACK handling (no CSV logging)
             del self.outstanding[key]
             return
         prev = self.pending_forwards.pop(key, None)
@@ -179,6 +229,11 @@ class Node:
             return
         # forward ACK to prev hop
         ack_dst = prev
+        try:
+            print(f"[node {self.node_id}] forwarding ACK orig_src={orig_src} orig_seq={orig_seq} to prev={prev}")
+        except Exception:
+            pass
+        # production: ACK forwarded (no CSV logging)
         ack = packets.make_ack(src=self.node_id, dst=ack_dst, orig_src=orig_src, orig_seq=orig_seq)
         self.send_packet(ack, to_next_hop=(prev if self.network is not None else None))
 

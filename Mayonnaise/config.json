@@ -2,11 +2,25 @@
   "node_id": 1,
   "node_name": "egg_1",
   "ground_station_id": 99,
+
   "use_hardware": true,
+  "hw_test_enabled": true,
+  "hw_test_target": 1,
+  "hw_test_interval_s": 6,
+  "hw_test_ack_timeout_s": 10,
+  "hw_test_max_retries": 2,
   "telemetry_enabled": true,
   "localisation_enabled": true,
 
   "allowed_neighbors": null,
+
+  "lbt": {
+    "enabled": true,
+    "cad_timeout_ms": 50,
+    "attempts": 3,
+    "backoff_min_ms": 20,
+    "backoff_max_ms": 220
+  },
 
   "lora": {
     "frequency": 433000000,

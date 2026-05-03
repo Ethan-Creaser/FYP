@@ -16,6 +16,7 @@ except Exception:
 
 import json
 import random
+import packets
 
 from node import Node
 import constants
@@ -30,7 +31,14 @@ def main():
         print("Failed to load config.json:", e)
         return
 
-    node_id = int(cfg.get("node_id", 1))
+    # prefer identity.bin when available (written by hardcode_egg_id.py)
+    try:
+        from identity import get_ids
+        node_id, uwb_id = get_ids(cfg_path=cfg_path)
+    except Exception:
+        node_id = int(cfg.get("node_id", 1))
+        uwb_id = None
+
     allowed = cfg.get("allowed_neighbors")
     allowlist = set(allowed) if allowed else None
 
@@ -50,8 +58,28 @@ def main():
             except Exception as e:
                 print("Could not start radio background:", e)
 
-    beacon_interval = getattr(constants, "BEACON_INTERVAL", 30)
-    next_beacon = time.time()
+        # attach OLED/status if available (log and force redraw)
+        try:
+            from oled_status import OLEDStatus
+            display = OLEDStatus()
+            try:
+                display.attach_node(node)
+                print("OLED attached")
+                try:
+                    # force an initial redraw so the display shows state on boot
+                    display._redraw()
+                except Exception:
+                    pass
+            except Exception as e:
+                print("OLED attach failed:", e)
+            node.display = display
+        except Exception as e:
+            print("OLED import failed:", e)
+            display = None
+
+        # production: no periodic hardware test in main.py (use Debug/hw_runner.py)
+        beacon_interval = getattr(constants, "BEACON_INTERVAL", 30)
+        next_beacon = time.time()
 
     try:
         while True:
@@ -67,6 +95,8 @@ def main():
                     node.radio.poll(timeout_ms=200)
                 except Exception as e:
                     print("radio poll error:", e)
+
+            # production main: periodic application behavior only (no built-in hw test here)
 
             # small sleep to yield
             try:

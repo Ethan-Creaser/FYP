@@ -1,4 +1,7 @@
-"""Simple in-process simulator for the mesh core to validate packet flow and forwarding."""
+"""Simple in-process simulator for the mesh core to validate packet flow and forwarding.
+
+Moved to Debug/ for tidiness.
+"""
 
 import time
 # avoid typing imports for MicroPython compatibility
