@@ -1,0 +1,1043 @@
+
+
+=== SESSION 2026-05-02 15:51:50 ===
+[15:52:14.416] [egg_8] LOCALISATION READY
+[15:52:14.443] [egg_8] UWB ms:        8959
+[15:52:14.444] [egg_8] Settle ms:     8000
+[15:52:14.611] [egg_6] LOCALISATION READY
+[15:52:14.611] [egg_6] UWB ms:        9016
+[15:52:14.611] [egg_6] Settle ms:     8000
+[15:52:14.676] [egg_7] LOCALISATION READY
+[15:52:14.705] [egg_7] UWB ms:        9016
+[15:52:14.706] [egg_7] Settle ms:     8000
+[15:52:15.373] [egg_8] STATUS
+[15:52:15.464] [egg_8] Role:          field_egg
+[15:52:15.465] [egg_8] State:         SETTLE
+[15:52:15.507] [egg_6] STATUS
+[15:52:15.568] [egg_6] Role:          field_egg
+[15:52:15.570] [egg_6] State:         SETTLE
+[15:52:15.607] [egg_7] STATUS
+[15:52:15.666] [egg_7] Role:          field_egg
+[15:52:15.667] [egg_7] State:         SETTLE
+[15:52:22.454] [egg_8] LOCALISATION DONE
+[15:52:22.483] [egg_8] Reason:        solo node
+[15:52:22.484] [egg_8] UWB role:      anchor
+[15:52:22.513] [egg_8] Position:      0.00, 0.00
+[15:52:22.646] [egg_6] LOCALISATION DONE
+[15:52:22.687] [egg_6] Reason:        solo node
+[15:52:22.687] [egg_6] UWB role:      anchor
+[15:52:22.688] [egg_7] LOCALISATION DONE
+[15:52:22.706] [egg_6] Position:      0.00, 0.00
+[15:52:22.715] [egg_7] Reason:        solo node
+[15:52:22.745] [egg_7] UWB role:      anchor
+[15:52:22.772] [egg_7] Position:      0.00, 0.00
+[15:52:24.853] [egg_8] STATUS
+[15:52:24.883] [egg_8] Role:          field_egg
+[15:52:24.884] [egg_8] State:         READY
+[15:52:24.942] [egg_8] Position:      0.00, 0.00
+[15:52:24.987] [egg_6] STATUS
+[15:52:25.019] [egg_6] Role:          field_egg
+[15:52:25.046] [egg_6] State:         READY
+[15:52:25.055] [egg_7] STATUS
+[15:52:25.086] [egg_7] Role:          field_egg
+[15:52:25.106] [egg_6] Position:      0.00, 0.00
+[15:52:25.114] [egg_7] State:         READY
+[15:52:25.146] [egg_7] Position:      0.00, 0.00
+[15:52:36.734] [egg_8] REPAIR TRIGGER
+[15:52:37.903] [egg_8] REPAIR REFRESH
+[15:52:37.992] [egg_8] LOCALISATION START
+[15:52:38.022] [egg_8] Reason:        repair
+[15:52:44.843] [egg_6] LOCALISATION READY
+[15:52:44.844] [egg_6] UWB ms:        9016
+[15:52:44.844] [egg_6] Settle ms:     8000
+[15:52:45.103] [egg_8] LOCALISATION READY
+[15:52:45.135] [egg_8] UWB ms:        8428
+[15:52:45.165] [egg_8] Settle ms:     8000
+[15:52:45.771] [egg_6] STATUS
+[15:52:45.800] [egg_6] Role:          field_egg
+[15:52:45.860] [egg_6] State:         SETTLE
+[15:52:45.965] [egg_7] DISC TRIGGERED RELOCALISE
+[15:52:46.029] [egg_7] LOCALISATION START
+[15:52:46.055] [egg_7] Reason:        new_peer
+[15:52:46.062] [egg_8] STATUS
+[15:52:46.122] [egg_8] Role:          field_egg
+[15:52:46.122] [egg_8] State:         SETTLE
+[15:52:46.241] [egg_8] Position:      0.00, 0.00
+
+=== SESSION 2026-05-02 15:53:05 ===
+[15:53:22.175] [egg_6] LOCALISATION READY
+[15:53:22.234] [egg_6] UWB ms:        9016
+[15:53:22.258] [egg_7] LOCALISATION READY
+[15:53:22.264] [egg_6] Settle ms:     8000
+[15:53:22.288] [egg_7] UWB ms:        9016
+[15:53:22.327] [egg_7] Settle ms:     8000
+[15:53:23.135] [egg_6] STATUS
+[15:53:23.167] [egg_6] Role:          field_egg
+[15:53:23.194] [egg_6] State:         SETTLE
+[15:53:23.216] [egg_7] STATUS
+[15:53:23.247] [egg_7] Role:          field_egg
+[15:53:23.247] [egg_7] State:         SETTLE
+[15:53:28.085] [egg_6] STATUS
+[15:53:28.115] [egg_6] Role:          field_egg
+[15:53:28.140] [egg_7] STATUS
+[15:53:28.147] [egg_6] State:         SETTLE
+[15:53:28.198] [egg_7] Role:          field_egg
+[15:53:28.199] [egg_7] State:         SETTLE
+[15:53:30.185] [egg_6] Peer:          8 uwb 2
+[15:53:30.217] [egg_6] LOCALISATION COORDINATOR
+[15:53:30.246] [egg_6] Members:       6,8
+[15:53:30.275] [egg_6] [TX LOCALISE_START] src=egg 6 to=broadcast via=egg 6 seq=49556005 ttl=1
+[15:53:30.298] [egg_7] Peer:          8 uwb 2
+[15:53:30.328] [egg_7] LOCALISATION COORDINATOR
+[15:53:30.358] [egg_7] Members:       7,8
+[15:53:30.387] [egg_7] [TX LOCALISE_START] src=egg 7 to=broadcast via=egg 7 seq=18676005 ttl=1
+[15:53:35.053] [egg_8] LOCALISATION READY
+[15:53:35.083] [egg_8] UWB ms:        9001
+[15:53:35.084] [egg_8] Settle ms:     8000
+[15:53:36.014] [egg_8] STATUS
+[15:53:36.075] [egg_8] Role:          field_egg
+[15:53:36.077] [egg_8] State:         SETTLE
+[15:53:43.093] [egg_8] LOCALISATION DONE
+[15:53:43.124] [egg_8] Reason:        solo node
+[15:53:43.124] [egg_8] UWB role:      anchor
+[15:53:43.154] [egg_8] Position:      0.00, 0.00
+[15:53:45.125] [egg_6] UWB SCAN
+[15:53:45.156] [egg_6] Raw:           {2: 0.09}
+[15:53:45.240] [egg_7] UWB SCAN
+[15:53:45.268] [egg_7] Raw:           {2: 0.29}
+[15:53:45.465] [egg_8] STATUS
+[15:53:45.526] [egg_8] Role:          field_egg
+[15:53:45.555] [egg_8] State:         READY
+[15:53:45.611] [egg_8] Position:      0.00, 0.00
+[15:53:52.238] [egg_6] Localise result: 1 targets
+[15:53:52.239] [egg_6] [TX LOCALISE_TURN] src=egg 6 to=egg 8 via=egg 6 seq=49556006 ttl=1 to=8
+[15:53:52.317] [egg_7] Localise result: 1 targets
+[15:53:52.348] [egg_7] [TX LOCALISE_TURN] src=egg 7 to=egg 8 via=egg 7 seq=18676006 ttl=1 to=8
+[15:54:08.375] [egg_6] [TX LOCALISE_POSITION] src=egg 6 to=broadcast via=egg 6 seq=49556007 ttl=1 node=6
+[15:54:08.489] [egg_7] [TX LOCALISE_POSITION] src=egg 7 to=broadcast via=egg 7 seq=18676007 ttl=1 node=7
+[15:54:09.516] [egg_6] [TX LOCALISE_POSITION] src=egg 6 to=broadcast via=egg 6 seq=49556008 ttl=1 node=8
+[15:54:09.631] [egg_7] [TX LOCALISE_POSITION] src=egg 7 to=broadcast via=egg 7 seq=18676008 ttl=1 node=8
+[15:54:10.636] [egg_8] RX LOCALISE_POSITION
+[15:54:11.354] [egg_8] STATUS
+[15:54:11.412] [egg_8] Role:          field_egg
+[15:54:11.413] [egg_8] State:         READY
+[15:54:11.474] [egg_8] Last RX:       LOCALISE_POSITION from 6
+[15:54:11.475] [egg_8] Position:      0.09, 0.00
+[15:54:19.721] [egg_6] LOCALISATION DONE
+[15:54:19.746] [egg_6] Reason:        coordinator solved
+[15:54:19.775] [egg_6] Coordinator:   6
+[15:54:19.776] [egg_6] UWB role:      tag
+[15:54:19.805] [egg_6] Position:      0.00, 0.00
+[15:54:19.828] [egg_7] LOCALISATION DONE
+[15:54:19.889] [egg_7] Reason:        coordinator solved
+[15:54:19.890] [egg_7] Coordinator:   7
+[15:54:19.892] [egg_7] UWB role:      tag
+[15:54:19.893] [egg_7] Position:      0.00, 0.00
+[15:54:22.276] [egg_8] STATUS
+[15:54:22.369] [egg_8] Role:          field_egg
+[15:54:22.370] [egg_8] State:         READY
+[15:54:22.421] [egg_8] Position:      0.09, 0.00
+[15:54:23.168] [egg_6] STATUS
+[15:54:23.196] [egg_6] Role:          field_egg
+[15:54:23.250] [egg_7] STATUS
+[15:54:23.255] [egg_6] State:         READY
+[15:54:23.260] [egg_6] Position:      0.00, 0.00
+[15:54:23.315] [egg_7] Role:          field_egg
+[15:54:23.316] [egg_7] State:         READY
+[15:54:23.398] [egg_7] Position:      0.00, 0.00
+[15:54:25.484] [egg_8] STATUS
+[15:54:25.559] [egg_7] STATUS
+[15:54:25.574] [egg_8] Role:          field_egg
+[15:54:25.575] [egg_8] State:         READY
+[15:54:25.589] [egg_7] Role:          field_egg
+[15:54:25.589] [egg_7] State:         READY
+[15:54:25.633] [egg_8] Position:      0.09, 0.00
+[15:54:25.649] [egg_7] Position:      0.00, 0.00
+[15:54:34.329] [egg_6] STATUS
+[15:54:34.386] [egg_6] Role:          field_egg
+[15:54:34.386] [egg_6] State:         READY
+[15:54:34.446] [egg_6] Position:      0.00, 0.00
+[15:54:36.816] [egg_6] STATUS
+[15:54:36.847] [egg_6] Role:          field_egg
+[15:54:36.888] [egg_6] State:         READY
+[15:54:36.935] [egg_6] Position:      0.00, 0.00
+[15:54:39.058] [egg_7] STATUS
+[15:54:39.089] [egg_7] Role:          field_egg
+[15:54:39.120] [egg_7] State:         READY
+[15:54:39.178] [egg_7] Position:      0.00, 0.00
+[15:54:52.019] [egg_7] STATUS
+[15:54:52.079] [egg_7] Role:          field_egg
+[15:54:52.081] [egg_7] State:         READY
+[15:54:52.138] [egg_7] Position:      0.00, 0.00
+
+=== SESSION 2026-05-02 16:13:37 ===
+
+=== SESSION 2026-05-02 16:13:43 ===
+
+=== SESSION 2026-05-02 16:14:23 ===
+
+=== SESSION 2026-05-02 16:14:46 ===
+
+=== SESSION 2026-05-02 16:15:03 ===
+
+=== SESSION 2026-05-02 16:35:46 ===
+[16:35:49.463] [egg_7] LOCALISATION READY
+[16:35:49.493] [egg_7] UWB ms:        9026
+[16:35:49.524] [egg_7] Settle ms:     8000
+[16:35:50.422] [egg_7] STATUS
+[16:35:50.454] [egg_7] Role:          field_egg
+[16:35:50.455] [egg_7] State:         SETTLE
+[16:35:57.359] [egg_8] LOCALISATION READY
+[16:35:57.400] [egg_8] UWB ms:        8957
+[16:35:57.419] [egg_8] Settle ms:     8000
+[16:35:57.505] [egg_7] LOCALISATION DONE
+[16:35:57.533] [egg_7] Reason:        solo node
+[16:35:57.563] [egg_7] UWB role:      anchor
+[16:35:57.565] [egg_7] Position:      0.00, 0.00
+[16:35:58.322] [egg_8] STATUS
+[16:35:58.382] [egg_8] Role:          field_egg
+[16:35:58.383] [egg_8] State:         SETTLE
+[16:35:59.901] [egg_7] STATUS
+[16:35:59.938] [egg_7] Role:          field_egg
+[16:35:59.939] [egg_7] State:         READY
+[16:35:59.964] [egg_7] Position:      0.00, 0.00
+[16:36:05.401] [egg_8] LOCALISATION DONE
+[16:36:05.431] [egg_8] Reason:        solo node
+[16:36:05.460] [egg_8] UWB role:      anchor
+[16:36:05.460] [egg_8] Position:      0.00, 0.00
+[16:36:06.685] [egg_7] REPAIR TRIGGER
+[16:36:07.800] [egg_8] STATUS
+[16:36:07.831] [egg_8] Role:          field_egg
+[16:36:07.864] [egg_8] State:         READY
+[16:36:07.920] [egg_8] Position:      0.00, 0.00
+[16:36:07.973] [egg_7] REPAIR REFRESH
+[16:36:08.062] [egg_7] LOCALISATION START
+[16:36:08.065] [egg_7] Reason:        repair
+[16:36:13.090] [egg_6] LOCALISATION READY
+[16:36:13.117] [egg_6] UWB ms:        9016
+[16:36:13.119] [egg_6] Settle ms:     8000
+[16:36:14.049] [egg_6] STATUS
+[16:36:14.077] [egg_6] Role:          field_egg
+[16:36:14.079] [egg_6] State:         SETTLE
+[16:36:14.279] [egg_8] DISC TRIGGERED RELOCALISE
+[16:36:14.339] [egg_8] LOCALISATION START
+[16:36:14.371] [egg_8] Reason:        new_peer
+[16:36:15.145] [egg_7] LOCALISATION READY
+[16:36:15.174] [egg_7] UWB ms:        8499
+[16:36:15.235] [egg_7] Settle ms:     8000
+[16:36:16.357] [egg_6] STATUS
+[16:36:16.387] [egg_6] Role:          field_egg
+[16:36:16.388] [egg_6] State:         SETTLE
+[16:36:17.243] [egg_7] STATUS
+[16:36:17.274] [egg_7] Role:          field_egg
+[16:36:17.301] [egg_7] State:         SETTLE
+[16:36:17.362] [egg_7] Position:      0.00, 0.00
+[16:36:18.489] [egg_6] STATUS
+[16:36:18.552] [egg_6] Role:          field_egg
+[16:36:18.552] [egg_6] State:         SETTLE
+[16:36:21.099] [egg_6] Peer:          7 uwb 7
+[16:36:21.158] [egg_6] LOCALISATION COORDINATOR
+[16:36:21.187] [egg_6] Members:       6,7
+[16:36:21.217] [egg_6] [TX LOCALISE_START] src=egg 6 to=broadcast via=egg 6 seq=18279005 ttl=1
+[16:36:21.452] [egg_8] LOCALISATION READY
+[16:36:21.509] [egg_8] UWB ms:        7411
+[16:36:21.510] [egg_8] Settle ms:     8000
+[16:36:22.374] [egg_7] STATUS
+[16:36:22.404] [egg_7] Role:          field_egg
+[16:36:22.436] [egg_7] State:         SETTLE
+[16:36:22.491] [egg_7] Position:      0.00, 0.00
+[16:36:22.582] [egg_7] REPAIR TRIGGER
+[16:36:22.672] [egg_7] REPAIR REFRESH
+[16:36:22.732] [egg_7] LOCALISATION START
+[16:36:22.762] [egg_7] Reason:        repair
+[16:36:23.581] [egg_8] STATUS
+[16:36:23.642] [egg_8] Role:          field_egg
+[16:36:23.642] [egg_8] State:         SETTLE
+[16:36:23.729] [egg_8] Position:      0.00, 0.00
+[16:36:29.070] [egg_8] REPAIR TRIGGER
+[16:36:29.161] [egg_8] REPAIR REFRESH
+[16:36:29.251] [egg_8] LOCALISATION START
+[16:36:29.281] [egg_8] Reason:        repair
+[16:36:29.844] [egg_7] LOCALISATION READY
+[16:36:29.908] [egg_7] UWB ms:        7277
+[16:36:29.909] [egg_7] Settle ms:     8000
+[16:36:30.832] [egg_7] STATUS
+[16:36:30.837] [egg_7] Role:          field_egg
+[16:36:30.837] [egg_7] State:         SETTLE
+[16:36:30.923] [egg_7] Position:      0.00, 0.00
+[16:36:35.211] [egg_7] REPAIR TRIGGER
+[16:36:35.303] [egg_7] REPAIR REFRESH
+[16:36:35.363] [egg_7] LOCALISATION START
+[16:36:35.392] [egg_7] Reason:        repair
+[16:36:36.067] [egg_6] UWB SCAN
+[16:36:36.099] [egg_6] Raw:           {2: 0.11, 7: 0.3}
+[16:36:36.392] [egg_8] LOCALISATION READY
+[16:36:36.452] [egg_8] UWB ms:        7311
+[16:36:36.453] [egg_8] Settle ms:     8000
+[16:36:38.491] [egg_8] STATUS
+[16:36:38.554] [egg_8] Role:          field_egg
+[16:36:38.555] [egg_8] State:         SETTLE
+[16:36:38.641] [egg_8] Position:      0.00, 0.00
+[16:36:42.474] [egg_7] LOCALISATION READY
+[16:36:42.533] [egg_7] UWB ms:        7273
+[16:36:42.535] [egg_7] Settle ms:     8000
+[16:36:43.149] [egg_6] Localise result: 1 targets
+[16:36:43.178] [egg_6] [TX LOCALISE_TURN] src=egg 6 to=egg 7 via=egg 6 seq=18279006 ttl=1 to=7
+[16:36:44.131] [egg_8] REPAIR TRIGGER
+[16:36:44.223] [egg_8] REPAIR REFRESH
+[16:36:44.281] [egg_8] LOCALISATION START
+[16:36:44.312] [egg_8] Reason:        repair
+[16:36:44.574] [egg_7] REPAIR TRIGGER
+[16:36:44.665] [egg_7] REPAIR REFRESH
+[16:36:44.723] [egg_7] LOCALISATION START
+[16:36:44.755] [egg_7] Reason:        repair
+[16:36:51.422] [egg_8] LOCALISATION READY
+[16:36:51.451] [egg_8] UWB ms:        7312
+[16:36:51.512] [egg_8] Settle ms:     8000
+[16:36:51.834] [egg_7] LOCALISATION READY
+[16:36:51.864] [egg_7] UWB ms:        8363
+[16:36:51.896] [egg_7] Settle ms:     8000
+[16:36:52.792] [egg_7] STATUS
+[16:36:52.823] [egg_7] Role:          field_egg
+[16:36:52.854] [egg_7] State:         SETTLE
+[16:36:52.912] [egg_7] Position:      0.00, 0.00
+[16:36:53.550] [egg_8] STATUS
+[16:36:53.582] [egg_8] Role:          field_egg
+[16:36:53.610] [egg_8] State:         SETTLE
+[16:36:53.671] [egg_8] Position:      0.00, 0.00
+[16:36:54.084] [egg_7] REPAIR TRIGGER
+[16:36:54.232] [egg_7] REPAIR REFRESH
+[16:36:54.262] [egg_7] LOCALISATION START
+[16:36:54.265] [egg_7] Reason:        repair
+[16:36:56.522] [egg_8] STATUS
+[16:36:56.582] [egg_8] Role:          field_egg
+[16:36:56.611] [egg_8] State:         SETTLE
+[16:36:56.670] [egg_8] Position:      0.00, 0.00
+[16:36:59.463] [egg_8] Peer:          6 uwb 0
+[16:36:59.522] [egg_8] LOCALISATION FOLLOWER WAIT
+[16:36:59.552] [egg_8] Coordinator:   6
+[16:36:59.701] [egg_8] STATUS
+[16:36:59.735] [egg_8] Role:          field_egg
+[16:36:59.737] [egg_8] State:         WAIT
+[16:36:59.792] [egg_8] Position:      0.00, 0.00
+[16:36:59.799] [egg_6] [TX LOCALISE_POSITION] src=egg 6 to=broadcast via=egg 6 seq=18279007 ttl=1 node=6
+[16:37:00.960] [egg_8] RX LOCALISE_POSITION
+[16:37:00.969] [egg_6] [TX LOCALISE_POSITION] src=egg 6 to=broadcast via=egg 6 seq=18279008 ttl=1 node=7
+[16:37:01.144] [egg_8] LOCALISATION DONE
+[16:37:01.172] [egg_8] Reason:        map received
+[16:37:01.175] [egg_8] Coordinator:   6
+[16:37:01.200] [egg_8] UWB role:      anchor
+[16:37:01.373] [egg_7] LOCALISATION READY
+[16:37:01.403] [egg_7] UWB ms:        8370
+[16:37:01.404] [egg_7] Settle ms:     8000
+[16:37:02.304] [egg_7] STATUS
+[16:37:02.365] [egg_7] Role:          field_egg
+[16:37:02.365] [egg_7] State:         SETTLE
+[16:37:02.426] [egg_7] Position:      0.00, 0.00
+[16:37:03.542] [egg_8] STATUS
+[16:37:03.575] [egg_8] Role:          field_egg
+[16:37:03.632] [egg_8] State:         READY
+[16:37:03.635] [egg_8] Last RX:       LOCALISE_POSITION from 6
+[16:37:03.662] [egg_8] Position:      0.00, 0.00
+[16:37:09.191] [egg_6] LOCALISATION DONE
+[16:37:09.193] [egg_6] Reason:        coordinator solved
+[16:37:09.219] [egg_6] Coordinator:   6
+[16:37:09.220] [egg_6] UWB role:      tag
+[16:37:09.247] [egg_6] Position:      0.00, 0.00
+[16:37:09.293] [egg_7] STATUS
+[16:37:09.354] [egg_7] Role:          field_egg
+[16:37:09.383] [egg_7] State:         SETTLE
+[16:37:09.417] [egg_7] Position:      0.00, 0.00
+[16:37:09.518] [egg_7] Peer:          8 uwb 2
+[16:37:09.537] [egg_7] LOCALISATION COORDINATOR
+[16:37:09.592] [egg_7] Members:       7,8
+[16:37:09.593] [egg_7] [TX LOCALISE_START] src=egg 7 to=broadcast via=egg 7 seq=32122020 ttl=1
+[16:37:10.560] [egg_8] STATUS
+[16:37:10.620] [egg_8] Role:          field_egg
+[16:37:10.622] [egg_8] State:         READY
+[16:37:10.682] [egg_8] Position:      0.00, 0.00
+[16:37:12.609] [egg_6] REPAIR TRIGGER
+[16:37:12.699] [egg_6] REPAIR REFRESH
+[16:37:12.762] [egg_6] LOCALISATION START
+[16:37:12.790] [egg_6] Reason:        repair
+[16:37:17.101] [egg_8] STATUS
+[16:37:17.162] [egg_8] Role:          field_egg
+[16:37:17.192] [egg_8] State:         READY
+[16:37:17.280] [egg_8] Position:      0.00, 0.00
+[16:37:19.901] [egg_6] LOCALISATION READY
+[16:37:19.930] [egg_6] UWB ms:        8352
+[16:37:19.930] [egg_6] Settle ms:     8000
+[16:37:20.829] [egg_6] STATUS
+[16:37:20.861] [egg_6] Role:          field_egg
+[16:37:20.888] [egg_6] State:         SETTLE
+[16:37:20.949] [egg_6] Position:      0.00, 0.00
+[16:37:22.147] [egg_6] REPAIR TRIGGER
+[16:37:22.239] [egg_6] REPAIR REFRESH
+[16:37:22.291] [egg_8] STATUS
+[16:37:22.300] [egg_6] LOCALISATION START
+[16:37:22.321] [egg_8] Role:          field_egg
+[16:37:22.328] [egg_6] Reason:        repair
+[16:37:22.349] [egg_8] State:         READY
+[16:37:22.439] [egg_8] Position:      0.00, 0.00
+[16:37:24.332] [egg_8] STATUS
+[16:37:24.383] [egg_7] UWB SCAN
+[16:37:24.392] [egg_8] Role:          field_egg
+[16:37:24.393] [egg_8] State:         READY
+[16:37:24.414] [egg_7] Raw:           {2: 0.14}
+[16:37:24.481] [egg_8] Position:      0.00, 0.00
+[16:37:29.408] [egg_6] LOCALISATION READY
+[16:37:29.444] [egg_6] UWB ms:        8362
+[16:37:29.451] [egg_6] Settle ms:     8000
+[16:37:30.369] [egg_6] STATUS
+[16:37:30.400] [egg_6] Role:          field_egg
+[16:37:30.401] [egg_6] State:         SETTLE
+[16:37:30.488] [egg_6] Position:      0.00, 0.00
+[16:37:31.465] [egg_7] Localise result: 1 targets
+[16:37:31.525] [egg_7] [TX LOCALISE_TURN] src=egg 7 to=egg 8 via=egg 7 seq=32122021 ttl=1 to=8
+[16:37:31.659] [egg_6] REPAIR TRIGGER
+[16:37:31.749] [egg_6] REPAIR REFRESH
+[16:37:31.843] [egg_6] LOCALISATION START
+[16:37:31.843] [egg_6] Reason:        repair
+[16:37:38.949] [egg_6] LOCALISATION READY
+[16:37:38.977] [egg_6] UWB ms:        8363
+[16:37:38.979] [egg_6] Settle ms:     8000
+[16:37:39.452] [egg_8] STATUS
+[16:37:39.512] [egg_8] Role:          field_egg
+[16:37:39.540] [egg_8] State:         READY
+[16:37:39.601] [egg_8] Position:      0.00, 0.00
+[16:37:39.882] [egg_6] STATUS
+[16:37:39.940] [egg_6] Role:          field_egg
+[16:37:39.942] [egg_6] State:         SETTLE
+[16:37:40.002] [egg_6] Position:      0.00, 0.00
+[16:37:43.540] [egg_8] STATUS
+[16:37:43.596] [egg_8] Role:          field_egg
+[16:37:43.621] [egg_8] State:         READY
+[16:37:43.681] [egg_8] Position:      0.00, 0.00
+[16:37:44.743] [egg_6] STATUS
+[16:37:44.803] [egg_6] Role:          field_egg
+[16:37:44.804] [egg_6] State:         SETTLE
+[16:37:44.859] [egg_6] Position:      0.00, 0.00
+[16:37:46.959] [egg_6] Peer:          8 uwb 2
+[16:37:46.960] [egg_6] Peer:          7 uwb 7
+[16:37:47.020] [egg_6] LOCALISATION COORDINATOR
+[16:37:47.049] [egg_6] Members:       6,7,8
+[16:37:47.078] [egg_6] [TX LOCALISE_START] src=egg 6 to=broadcast via=egg 6 seq=18279019 ttl=1
+[16:37:47.662] [egg_7] [TX LOCALISE_POSITION] src=egg 7 to=broadcast via=egg 7 seq=32122022 ttl=1 node=7
+[16:37:48.834] [egg_7] [TX LOCALISE_POSITION] src=egg 7 to=broadcast via=egg 7 seq=32122023 ttl=1 node=8
+[16:37:49.922] [egg_8] RX LOCALISE_POSITION
+[16:37:50.762] [egg_8] STATUS
+[16:37:50.822] [egg_8] Role:          field_egg
+[16:37:50.825] [egg_8] State:         READY
+[16:37:50.852] [egg_8] Last RX:       LOCALISE_POSITION from 7
+[16:37:50.882] [egg_8] Position:      0.14, 0.00
+[16:37:57.023] [egg_7] LOCALISATION DONE
+[16:37:57.082] [egg_7] Reason:        coordinator solved
+[16:37:57.083] [egg_7] Coordinator:   7
+[16:37:57.085] [egg_7] UWB role:      tag
+[16:37:57.087] [egg_7] Position:      0.00, 0.00
+[16:37:59.276] [egg_7] STATUS
+[16:37:59.334] [egg_7] Role:          field_egg
+[16:37:59.368] [egg_7] State:         READY
+[16:37:59.423] [egg_7] Position:      0.00, 0.00
+[16:38:00.040] [egg_6] UWB SCAN
+[16:38:00.098] [egg_6] Raw:           {2: 0.16}
+[16:38:00.565] [egg_7] REPAIR TRIGGER
+[16:38:00.715] [egg_7] REPAIR REFRESH
+[16:38:00.718] [egg_7] LOCALISATION START
+[16:38:00.745] [egg_7] Reason:        repair
+[16:38:01.833] [egg_8] STATUS
+[16:38:01.863] [egg_8] Role:          field_egg
+[16:38:01.892] [egg_8] State:         READY
+[16:38:01.952] [egg_8] Position:      0.14, 0.00
+[16:38:07.150] [egg_6] Localise result: 1 targets
+[16:38:07.180] [egg_6] [TX LOCALISE_TURN] src=egg 6 to=egg 7 via=egg 6 seq=18279020 ttl=1 to=7
+[16:38:07.858] [egg_7] LOCALISATION READY
+[16:38:07.859] [egg_7] UWB ms:        8334
+[16:38:07.888] [egg_7] Settle ms:     8000
+[16:38:08.758] [egg_7] STATUS
+[16:38:08.815] [egg_7] Role:          field_egg
+[16:38:08.815] [egg_7] State:         SETTLE
+[16:38:08.905] [egg_7] Position:      0.00, 0.00
+[16:38:10.075] [egg_7] REPAIR TRIGGER
+[16:38:10.165] [egg_7] REPAIR REFRESH
+[16:38:10.255] [egg_7] LOCALISATION START
+[16:38:10.287] [egg_7] Reason:        repair
+[16:38:16.983] [egg_8] STATUS
+[16:38:17.042] [egg_8] Role:          field_egg
+[16:38:17.072] [egg_8] State:         READY
+[16:38:17.133] [egg_8] Position:      0.14, 0.00
+[16:38:17.336] [egg_7] LOCALISATION READY
+[16:38:17.404] [egg_7] UWB ms:        8361
+[16:38:17.404] [egg_7] Settle ms:     8000
+[16:38:18.294] [egg_7] STATUS
+[16:38:18.385] [egg_7] Role:          field_egg
+[16:38:18.386] [egg_7] State:         SETTLE
+[16:38:18.418] [egg_7] Position:      0.00, 0.00
+[16:38:19.617] [egg_7] REPAIR TRIGGER
+[16:38:19.704] [egg_7] REPAIR REFRESH
+[16:38:19.766] [egg_7] LOCALISATION START
+[16:38:19.795] [egg_7] Reason:        repair
+[16:38:22.086] [egg_8] STATUS
+[16:38:22.113] [egg_8] Role:          field_egg
+[16:38:22.143] [egg_8] State:         READY
+[16:38:22.203] [egg_8] Position:      0.14, 0.00
+[16:38:23.471] [egg_6] [TX LOCALISE_TURN] src=egg 6 to=egg 8 via=egg 6 seq=18279021 ttl=1 to=8
+[16:38:26.042] [egg_8] STATUS
+[16:38:26.074] [egg_8] Role:          field_egg
+[16:38:26.102] [egg_8] State:         READY
+[16:38:26.164] [egg_8] Position:      0.14, 0.00
+[16:38:26.875] [egg_7] LOCALISATION READY
+[16:38:26.906] [egg_7] UWB ms:        8369
+[16:38:26.936] [egg_7] Settle ms:     8000
+[16:38:27.807] [egg_7] STATUS
+[16:38:27.866] [egg_7] Role:          field_egg
+[16:38:27.868] [egg_7] State:         SETTLE
+[16:38:27.955] [egg_7] Position:      0.00, 0.00
+[16:38:34.929] [egg_7] Peer:          8 uwb 2
+[16:38:34.931] [egg_7] Peer:          6 uwb 0
+[16:38:34.974] [egg_7] LOCALISATION FOLLOWER WAIT
+[16:38:35.007] [egg_7] Coordinator:   6
+[16:38:35.245] [egg_7] STATUS
+[16:38:35.277] [egg_7] Role:          field_egg
+[16:38:35.307] [egg_7] State:         WAIT
+[16:38:35.396] [egg_7] Position:      0.00, 0.00
+[16:38:36.093] [egg_8] STATUS
+[16:38:36.152] [egg_8] Role:          field_egg
+[16:38:36.156] [egg_8] State:         READY
+[16:38:36.242] [egg_8] Position:      0.14, 0.00
+[16:38:40.225] [egg_7] STATUS
+[16:38:40.256] [egg_7] Role:          field_egg
+[16:38:40.285] [egg_7] State:         WAIT
+[16:38:40.346] [egg_7] Position:      0.00, 0.00
+[16:38:40.451] [egg_6] [TX LOCALISE_POSITION] src=egg 6 to=broadcast via=egg 6 seq=18279022 ttl=1 node=6
+[16:38:41.107] [egg_8] STATUS
+[16:38:41.132] [egg_8] Role:          field_egg
+[16:38:41.163] [egg_8] State:         READY
+[16:38:41.222] [egg_8] Position:      0.14, 0.00
+[16:38:41.577] [egg_7] RX LOCALISE_POSITION
+[16:38:41.586] [egg_8] RX LOCALISE_POSITION
+[16:38:41.619] [egg_6] [TX LOCALISE_POSITION] src=egg 6 to=broadcast via=egg 6 seq=18279023 ttl=1 node=7
+[16:38:42.153] [egg_8] STATUS
+[16:38:42.211] [egg_8] Role:          field_egg
+[16:38:42.213] [egg_8] State:         READY
+[16:38:42.278] [egg_8] Last RX:       LOCALISE_POSITION from 6
+[16:38:42.296] [egg_7] STATUS
+[16:38:42.303] [egg_8] Position:      0.14, 0.00
+[16:38:42.327] [egg_7] Role:          field_egg
+[16:38:42.328] [egg_7] State:         WAIT
+[16:38:42.386] [egg_7] Last RX:       LOCALISE_POSITION from 6
+[16:38:42.387] [egg_7] Position:      0.00, 0.00
+[16:38:42.745] [egg_7] RX LOCALISE_POSITION
+[16:38:42.767] [egg_6] [TX LOCALISE_POSITION] src=egg 6 to=broadcast via=egg 6 seq=18279024 ttl=1 node=8
+[16:38:42.783] [egg_8] RX LOCALISE_POSITION
+[16:38:42.927] [egg_7] LOCALISATION DONE
+[16:38:42.954] [egg_7] Reason:        map received
+[16:38:42.954] [egg_7] Coordinator:   6
+[16:38:42.955] [egg_7] UWB role:      anchor
+[16:38:42.985] [egg_7] Position:      1.00, 0.00
+[16:38:45.356] [egg_7] STATUS
+[16:38:45.360] [egg_7] Role:          field_egg
+[16:38:45.362] [egg_7] State:         READY
+[16:38:45.414] [egg_7] Last RX:       LOCALISE_POSITION from 6
+[16:38:45.444] [egg_7] Position:      1.00, 0.00
+[16:38:46.414] [egg_8] STATUS
+[16:38:46.476] [egg_8] Role:          field_egg
+[16:38:46.503] [egg_8] State:         READY
+[16:38:46.562] [egg_8] Position:      0.14, 0.00
+[16:38:52.963] [egg_6] LOCALISATION DONE
+[16:38:52.991] [egg_6] Reason:        coordinator solved
+[16:38:53.023] [egg_6] Coordinator:   6
+[16:38:53.024] [egg_6] UWB role:      tag
+[16:38:53.024] [egg_6] Position:      0.00, 0.00
+[16:38:54.955] [egg_7] STATUS
+[16:38:54.986] [egg_7] Role:          field_egg
+[16:38:55.046] [egg_7] State:         READY
+[16:38:55.050] [egg_7] Last RX:       LOCALISE_POSITION from 6
+[16:38:55.076] [egg_7] Position:      1.00, 0.00
+[16:38:56.414] [egg_6] STATUS
+[16:38:56.471] [egg_6] Role:          field_egg
+[16:38:56.473] [egg_6] State:         READY
+[16:38:56.496] [egg_8] STATUS
+[16:38:56.523] [egg_8] Role:          field_egg
+[16:38:56.532] [egg_6] Position:      0.00, 0.00
+[16:38:56.546] [egg_7] STATUS
+[16:38:56.557] [egg_8] State:         READY
+[16:38:56.584] [egg_7] Role:          field_egg
+[16:38:56.616] [egg_7] State:         READY
+[16:38:56.617] [egg_8] Position:      0.14, 0.00
+[16:38:56.666] [egg_7] Position:      1.00, 0.00
+[16:38:58.721] [egg_6] STATUS
+[16:38:58.783] [egg_6] Role:          field_egg
+[16:38:58.810] [egg_6] State:         READY
+[16:38:58.844] [egg_6] Position:      0.00, 0.00
+[16:39:00.219] [egg_6] STATUS
+[16:39:00.310] [egg_6] Role:          field_egg
+[16:39:00.311] [egg_6] State:         READY
+[16:39:00.344] [egg_6] Position:      0.00, 0.00
+[16:39:01.384] [egg_8] STATUS
+[16:39:01.444] [egg_8] Role:          field_egg
+[16:39:01.444] [egg_8] State:         READY
+[16:39:01.505] [egg_8] Position:      0.14, 0.00
+[16:39:09.086] [egg_7] STATUS
+[16:39:09.117] [egg_7] Role:          field_egg
+[16:39:09.146] [egg_7] State:         READY
+[16:39:09.205] [egg_7] Position:      1.00, 0.00
+[16:39:10.271] [egg_6] STATUS
+[16:39:10.301] [egg_6] Role:          field_egg
+[16:39:10.330] [egg_6] State:         READY
+[16:39:10.389] [egg_6] Position:      0.00, 0.00
+[16:39:11.125] [egg_7] STATUS
+[16:39:11.156] [egg_7] Role:          field_egg
+[16:39:11.158] [egg_7] State:         READY
+[16:39:11.216] [egg_7] Position:      1.00, 0.00
+[16:39:12.807] [egg_7] STATUS
+[16:39:12.900] [egg_7] Role:          field_egg
+[16:39:12.901] [egg_7] State:         READY
+[16:39:12.928] [egg_7] Position:      1.00, 0.00
+[16:39:15.124] [egg_8] STATUS
+[16:39:15.153] [egg_8] Role:          field_egg
+[16:39:15.185] [egg_8] State:         READY
+[16:39:15.243] [egg_8] Position:      0.14, 0.00
+[16:39:16.348] [egg_7] STATUS
+[16:39:16.407] [egg_7] Role:          field_egg
+[16:39:16.407] [egg_7] State:         READY
+[16:39:16.467] [egg_7] Position:      1.00, 0.00
+[16:39:17.474] [egg_6] STATUS
+[16:39:17.501] [egg_6] Role:          field_egg
+[16:39:17.531] [egg_6] State:         READY
+[16:39:17.591] [egg_6] Position:      0.00, 0.00
+[16:39:19.826] [egg_7] STATUS
+[16:39:19.857] [egg_7] Role:          field_egg
+[16:39:19.888] [egg_7] State:         READY
+[16:39:19.976] [egg_7] Position:      1.00, 0.00
+[16:39:21.104] [egg_6] STATUS
+[16:39:21.173] [egg_6] Role:          field_egg
+[16:39:21.187] [egg_6] State:         READY
+[16:39:21.254] [egg_6] Position:      0.00, 0.00
+[16:39:28.804] [egg_8] STATUS
+[16:39:28.864] [egg_8] Role:          field_egg
+[16:39:28.864] [egg_8] State:         READY
+[16:39:28.924] [egg_8] Position:      0.14, 0.00
+[16:39:30.989] [egg_7] STATUS
+[16:39:31.047] [egg_7] Role:          field_egg
+[16:39:31.048] [egg_7] State:         READY
+[16:39:31.135] [egg_7] Position:      1.00, 0.00
+[16:39:31.152] [egg_6] STATUS
+[16:39:31.156] [egg_6] Role:          field_egg
+[16:39:31.183] [egg_6] State:         READY
+[16:39:31.241] [egg_6] Position:      0.00, 0.00
+[16:39:43.865] [egg_8] STATUS
+[16:39:43.924] [egg_8] Role:          field_egg
+[16:39:43.925] [egg_8] State:         READY
+[16:39:44.013] [egg_8] Position:      0.14, 0.00
+[16:39:46.109] [egg_7] STATUS
+[16:39:46.138] [egg_7] Role:          field_egg
+[16:39:46.169] [egg_7] State:         READY
+[16:39:46.225] [egg_7] Position:      1.00, 0.00
+[16:39:46.273] [egg_6] STATUS
+[16:39:46.302] [egg_6] Role:          field_egg
+[16:39:46.331] [egg_6] State:         READY
+[16:39:46.423] [egg_6] Position:      0.00, 0.00
+[16:40:28.649] [egg_7] STATUS
+[16:40:28.707] [egg_7] Role:          field_egg
+[16:40:28.710] [egg_7] State:         READY
+[16:40:28.771] [egg_7] Position:      1.00, 0.00
+[16:40:43.798] [egg_7] STATUS
+[16:40:43.827] [egg_7] Role:          field_egg
+[16:40:43.828] [egg_7] State:         READY
+[16:40:43.892] [egg_7] Position:      1.00, 0.00
+
+=== SESSION 2026-05-02 16:42:24 ===
+[16:42:26.698] [egg_6] LOCALISATION READY
+[16:42:26.732] [egg_6] UWB ms:        8943
+[16:42:26.733] [egg_6] Settle ms:     8000
+
+=== SESSION 2026-05-02 16:42:38 ===
+[16:42:56.432] [egg_8] LOCALISATION READY
+[16:42:56.460] [egg_8] UWB ms:        9026
+[16:42:56.476] [egg_6] LOCALISATION READY
+[16:42:56.488] [egg_8] Settle ms:     8000
+[16:42:56.537] [egg_6] UWB ms:        9016
+[16:42:56.537] [egg_6] Settle ms:     8000
+[16:42:56.586] [egg_7] LOCALISATION READY
+[16:42:56.648] [egg_7] UWB ms:        9026
+[16:42:56.648] [egg_7] Settle ms:     8000
+[16:42:58.307] [egg_6] STATUS
+[16:42:58.365] [egg_6] Role:          field_egg
+[16:42:58.365] [egg_6] State:         SETTLE
+[16:42:58.567] [egg_7] STATUS
+[16:42:58.590] [egg_8] STATUS
+[16:42:58.597] [egg_7] Role:          field_egg
+[16:42:58.625] [egg_7] State:         SETTLE
+[16:42:58.648] [egg_8] Role:          field_egg
+[16:42:58.653] [egg_8] State:         SETTLE
+[16:43:05.414] [egg_6] LOCALISATION DONE
+[16:43:05.477] [egg_6] Reason:        solo node
+[16:43:05.478] [egg_6] UWB role:      anchor
+[16:43:05.479] [egg_6] Position:      0.00, 0.00
+[16:43:05.707] [egg_7] LOCALISATION DONE
+[16:43:05.732] [egg_8] LOCALISATION DONE
+[16:43:05.761] [egg_8] Reason:        solo node
+[16:43:05.762] [egg_8] UWB role:      anchor
+[16:43:05.767] [egg_7] Reason:        solo node
+[16:43:05.771] [egg_7] UWB role:      anchor
+[16:43:05.772] [egg_7] Position:      0.00, 0.00
+[16:43:05.789] [egg_8] Position:      0.00, 0.00
+[16:43:07.694] [egg_6] STATUS
+[16:43:07.725] [egg_6] Role:          field_egg
+[16:43:07.756] [egg_6] State:         READY
+[16:43:07.812] [egg_6] Position:      0.00, 0.00
+[16:43:08.010] [egg_8] STATUS
+[16:43:08.017] [egg_7] STATUS
+[16:43:08.073] [egg_8] Role:          field_egg
+[16:43:08.077] [egg_8] State:         READY
+[16:43:08.107] [egg_7] Role:          field_egg
+[16:43:08.133] [egg_8] Position:      0.00, 0.00
+[16:43:08.136] [egg_7] State:         READY
+[16:43:08.198] [egg_7] Position:      0.00, 0.00
+
+=== SESSION 2026-05-02 17:01:09 ===
+[17:01:20.319] [egg_8] LOCALISATION READY
+[17:01:20.347] [egg_8] UWB ms:        9038
+[17:01:20.347] [egg_8] Settle ms:     8000
+[17:01:22.478] [egg_8] STATUS
+[17:01:22.508] [egg_8] Role:          field_egg
+[17:01:22.545] [egg_8] State:         SETTLE
+[17:01:26.566] [egg_7] LOCALISATION READY
+[17:01:26.595] [egg_7] UWB ms:        9026
+[17:01:26.595] [egg_7] Settle ms:     8000
+[17:01:26.662] [egg_6] LOCALISATION READY
+[17:01:26.693] [egg_6] UWB ms:        8946
+[17:01:26.694] [egg_6] Settle ms:     8000
+[17:01:28.494] [egg_6] STATUS
+[17:01:28.545] [egg_7] STATUS
+[17:01:28.553] [egg_6] Role:          field_egg
+[17:01:28.554] [egg_6] State:         SETTLE
+[17:01:28.607] [egg_7] Role:          field_egg
+[17:01:28.607] [egg_7] State:         SETTLE
+[17:01:28.720] [egg_8] LOCALISATION DONE
+[17:01:28.776] [egg_8] Reason:        solo node
+[17:01:28.782] [egg_8] UWB role:      anchor
+[17:01:28.808] [egg_8] Position:      0.00, 0.00
+[17:01:31.028] [egg_8] STATUS
+[17:01:31.088] [egg_8] Role:          field_egg
+[17:01:31.088] [egg_8] State:         READY
+[17:01:31.177] [egg_8] Position:      0.00, 0.00
+[17:01:32.243] [egg_6] STATUS
+[17:01:32.267] [egg_7] STATUS
+[17:01:32.273] [egg_6] Role:          field_egg
+[17:01:32.302] [egg_6] State:         SETTLE
+[17:01:32.325] [egg_7] Role:          field_egg
+[17:01:32.353] [egg_7] State:         SETTLE
+[17:01:34.761] [egg_6] LOCALISATION DONE
+[17:01:34.764] [egg_6] Reason:        solo node
+[17:01:34.785] [egg_7] LOCALISATION DONE
+[17:01:34.791] [egg_6] UWB role:      anchor
+[17:01:34.791] [egg_6] Position:      0.00, 0.00
+[17:01:34.816] [egg_7] Reason:        solo node
+[17:01:34.817] [egg_7] UWB role:      anchor
+[17:01:34.845] [egg_7] Position:      0.00, 0.00
+[17:01:36.035] [egg_8] REPAIR TRIGGER
+[17:01:37.014] [egg_6] STATUS
+[17:01:37.096] [egg_7] STATUS
+[17:01:37.098] [egg_7] Role:          field_egg
+[17:01:37.103] [egg_6] Role:          field_egg
+[17:01:37.105] [egg_6] State:         READY
+[17:01:37.126] [egg_7] State:         READY
+[17:01:37.161] [egg_6] Position:      0.00, 0.00
+[17:01:37.186] [egg_7] Position:      0.00, 0.00
+[17:01:37.393] [egg_8] REPAIR REFRESH
+[17:01:37.418] [egg_8] LOCALISATION START
+[17:01:37.480] [egg_8] Reason:        repair
+[17:01:44.559] [egg_8] LOCALISATION READY
+[17:01:44.590] [egg_8] UWB ms:        8573
+[17:01:44.616] [egg_8] Settle ms:     8000
+[17:01:46.996] [egg_7] STATUS
+[17:01:47.004] [egg_6] STATUS
+[17:01:47.057] [egg_7] Role:          field_egg
+[17:01:47.062] [egg_6] Role:          field_egg
+[17:01:47.062] [egg_6] State:         READY
+[17:01:47.085] [egg_7] State:         READY
+[17:01:47.115] [egg_7] Position:      0.00, 0.00
+[17:01:47.123] [egg_6] Position:      0.00, 0.00
+[17:01:47.892] [egg_8] STATUS
+[17:01:47.917] [egg_8] Role:          field_egg
+[17:01:47.949] [egg_8] State:         SETTLE
+[17:01:48.008] [egg_8] Position:      0.00, 0.00
+
+=== SESSION 2026-05-02 17:02:05 ===
+[17:02:20.686] [egg_8] LOCALISATION READY
+[17:02:20.715] [egg_8] UWB ms:        9026
+[17:02:20.730] [egg_6] LOCALISATION READY
+[17:02:20.743] [egg_8] Settle ms:     8000
+[17:02:20.789] [egg_6] UWB ms:        9036
+[17:02:20.791] [egg_6] Settle ms:     8000
+[17:02:20.812] [egg_7] LOCALISATION READY
+[17:02:20.842] [egg_7] UWB ms:        9016
+[17:02:20.843] [egg_7] Settle ms:     8000
+[17:02:22.592] [egg_6] STATUS
+[17:02:22.649] [egg_6] Role:          field_egg
+[17:02:22.651] [egg_6] State:         SETTLE
+[17:02:22.794] [egg_7] STATUS
+[17:02:22.845] [egg_8] STATUS
+[17:02:22.853] [egg_7] Role:          field_egg
+[17:02:22.853] [egg_7] State:         SETTLE
+[17:02:22.876] [egg_8] Role:          field_egg
+[17:02:22.906] [egg_8] State:         SETTLE
+[17:02:28.830] [egg_6] LOCALISATION DONE
+[17:02:28.860] [egg_6] Reason:        solo node
+[17:02:28.861] [egg_6] UWB role:      anchor
+[17:02:28.861] [egg_6] Position:      0.00, 0.00
+[17:02:29.054] [egg_8] LOCALISATION DONE
+[17:02:29.087] [egg_8] Reason:        solo node
+[17:02:29.088] [egg_8] UWB role:      anchor
+[17:02:29.093] [egg_7] LOCALISATION DONE
+[17:02:29.095] [egg_7] Reason:        solo node
+[17:02:29.095] [egg_7] UWB role:      anchor
+[17:02:29.115] [egg_8] Position:      0.00, 0.00
+[17:02:29.123] [egg_7] Position:      0.00, 0.00
+[17:02:31.110] [egg_6] STATUS
+[17:02:31.170] [egg_6] Role:          field_egg
+[17:02:31.171] [egg_6] State:         READY
+[17:02:31.208] [egg_6] Position:      0.00, 0.00
+[17:02:31.336] [egg_8] STATUS
+[17:02:31.343] [egg_7] STATUS
+[17:02:31.396] [egg_8] Role:          field_egg
+[17:02:31.397] [egg_8] State:         READY
+[17:02:31.403] [egg_7] Role:          field_egg
+[17:02:31.404] [egg_7] State:         READY
+[17:02:31.455] [egg_8] Position:      0.00, 0.00
+[17:02:31.463] [egg_7] Position:      0.00, 0.00
+[17:03:35.018] [egg_8] LOCALISATION READY
+[17:03:35.049] [egg_8] UWB ms:        9016
+[17:03:35.078] [egg_8] Settle ms:     8000
+[17:03:35.536] [egg_7] LOCALISATION READY
+[17:03:35.566] [egg_7] UWB ms:        8947
+[17:03:35.595] [egg_7] Settle ms:     8000
+[17:03:36.564] [egg_6] LOCALISATION READY
+[17:03:36.625] [egg_6] UWB ms:        9016
+[17:03:36.625] [egg_6] Settle ms:     8000
+[17:03:37.178] [egg_8] STATUS
+[17:03:37.210] [egg_8] Role:          field_egg
+[17:03:37.240] [egg_8] State:         SETTLE
+[17:03:37.546] [egg_7] STATUS
+[17:03:37.575] [egg_7] Role:          field_egg
+[17:03:37.605] [egg_7] State:         SETTLE
+[17:03:38.425] [egg_6] STATUS
+[17:03:38.456] [egg_6] Role:          field_egg
+[17:03:38.484] [egg_6] State:         SETTLE
+[17:03:40.666] [egg_7] STATUS
+[17:03:40.691] [egg_8] STATUS
+[17:03:40.697] [egg_7] Role:          field_egg
+[17:03:40.725] [egg_7] State:         SETTLE
+[17:03:40.747] [egg_8] Role:          field_egg
+[17:03:40.748] [egg_8] State:         SETTLE
+[17:03:43.389] [egg_8] LOCALISATION DONE
+[17:03:43.420] [egg_8] Reason:        solo node
+[17:03:43.448] [egg_8] UWB role:      anchor
+[17:03:43.449] [egg_8] Position:      0.00, 0.00
+[17:03:43.786] [egg_7] LOCALISATION DONE
+[17:03:43.817] [egg_7] Reason:        solo node
+[17:03:43.847] [egg_7] UWB role:      anchor
+[17:03:43.848] [egg_7] Position:      0.00, 0.00
+[17:03:45.385] [egg_6] STATUS
+[17:03:45.444] [egg_6] Role:          field_egg
+[17:03:45.444] [egg_6] State:         SETTLE
+[17:03:45.595] [egg_6] LOCALISATION DONE
+[17:03:45.625] [egg_6] Reason:        solo node
+[17:03:45.655] [egg_6] UWB role:      anchor
+[17:03:45.656] [egg_6] Position:      0.00, 0.00
+[17:03:45.698] [egg_8] STATUS
+[17:03:45.729] [egg_8] Role:          field_egg
+[17:03:45.759] [egg_8] State:         READY
+[17:03:45.789] [egg_8] Position:      0.00, 0.00
+[17:03:46.095] [egg_7] STATUS
+[17:03:46.126] [egg_7] Role:          field_egg
+[17:03:46.157] [egg_7] State:         READY
+[17:03:46.216] [egg_7] Position:      0.00, 0.00
+[17:03:47.905] [egg_6] STATUS
+[17:03:47.933] [egg_6] Role:          field_egg
+[17:03:47.933] [egg_6] State:         READY
+[17:03:47.993] [egg_6] Position:      0.00, 0.00
+[17:03:48.188] [egg_8] STATUS
+[17:03:48.221] [egg_8] Role:          field_egg
+[17:03:48.221] [egg_8] State:         READY
+[17:03:48.248] [egg_8] Position:      0.00, 0.00
+[17:03:53.050] [egg_8] STATUS
+[17:03:53.109] [egg_8] Role:          field_egg
+[17:03:53.111] [egg_8] State:         READY
+[17:03:53.169] [egg_8] Position:      0.00, 0.00
+
+=== SESSION 2026-05-02 17:04:26 ===
+[17:04:39.982] [egg_8] LOCALISATION READY
+[17:04:40.009] [egg_8] UWB ms:        8946
+[17:04:40.036] [egg_8] Settle ms:     8000
+[17:04:41.064] [egg_7] LOCALISATION READY
+[17:04:41.095] [egg_7] UWB ms:        8946
+[17:04:41.096] [egg_7] Settle ms:     8000
+[17:04:42.063] [egg_6] LOCALISATION READY
+[17:04:42.094] [egg_6] UWB ms:        8946
+[17:04:42.122] [egg_6] Settle ms:     8000
+[17:04:42.137] [egg_8] STATUS
+[17:04:42.168] [egg_8] Role:          field_egg
+[17:04:42.196] [egg_8] State:         SETTLE
+[17:04:43.076] [egg_7] STATUS
+[17:04:43.108] [egg_7] Role:          field_egg
+[17:04:43.109] [egg_7] State:         SETTLE
+[17:04:43.922] [egg_6] STATUS
+[17:04:43.953] [egg_6] Role:          field_egg
+[17:04:43.982] [egg_6] State:         SETTLE
+[17:04:46.159] [egg_8] STATUS
+[17:04:46.168] [egg_7] STATUS
+[17:04:46.217] [egg_8] Role:          field_egg
+[17:04:46.217] [egg_8] State:         SETTLE
+[17:04:46.224] [egg_7] Role:          field_egg
+[17:04:46.225] [egg_7] State:         SETTLE
+[17:04:48.408] [egg_8] LOCALISATION DONE
+[17:04:48.439] [egg_8] Reason:        solo node
+[17:04:48.467] [egg_8] UWB role:      anchor
+[17:04:48.467] [egg_8] Position:      0.00, 0.00
+[17:04:49.317] [egg_7] LOCALISATION DONE
+[17:04:49.348] [egg_7] Reason:        solo node
+[17:04:49.349] [egg_7] UWB role:      anchor
+[17:04:49.376] [egg_7] Position:      0.00, 0.00
+[17:04:50.402] [egg_6] STATUS
+[17:04:50.464] [egg_6] Role:          field_egg
+[17:04:50.464] [egg_6] State:         SETTLE
+[17:04:50.612] [egg_6] LOCALISATION DONE
+[17:04:50.642] [egg_6] Reason:        solo node
+[17:04:50.642] [egg_6] UWB role:      anchor
+[17:04:50.671] [egg_6] Position:      0.00, 0.00
+[17:04:50.687] [egg_8] STATUS
+[17:04:50.748] [egg_8] Role:          field_egg
+[17:04:50.748] [egg_8] State:         READY
+[17:04:50.807] [egg_8] Position:      0.00, 0.00
+[17:04:51.626] [egg_7] STATUS
+[17:04:51.658] [egg_7] Role:          field_egg
+[17:04:51.659] [egg_7] State:         READY
+[17:04:51.715] [egg_7] Position:      0.00, 0.00
+[17:04:52.892] [egg_6] STATUS
+[17:04:52.953] [egg_6] Role:          field_egg
+[17:04:52.954] [egg_6] State:         READY
+[17:04:53.015] [egg_6] Position:      0.00, 0.00
+[17:04:57.687] [egg_7] STATUS
+[17:04:57.716] [egg_7] Role:          field_egg
+[17:04:57.719] [egg_7] State:         READY
+[17:04:57.776] [egg_7] Position:      0.00, 0.00
+[17:05:01.047] [egg_7] STATUS
+[17:05:01.106] [egg_7] Role:          field_egg
+[17:05:01.107] [egg_7] State:         READY
+[17:05:01.166] [egg_7] Position:      0.00, 0.00
+[17:05:13.917] [egg_7] STATUS
+[17:05:13.977] [egg_7] Role:          field_egg
+[17:05:13.978] [egg_7] State:         READY
+[17:05:14.037] [egg_7] Position:      0.00, 0.00
+[17:05:29.065] [egg_7] STATUS
+[17:05:29.099] [egg_7] Role:          field_egg
+[17:05:29.125] [egg_7] State:         READY
+[17:05:29.185] [egg_7] Position:      0.00, 0.00
+[17:05:54.205] [egg_8] REPAIR TRIGGER
+[17:05:55.431] [egg_8] REPAIR REFRESH
+[17:05:55.493] [egg_8] LOCALISATION START
+[17:05:55.524] [egg_8] Reason:        repair
+[17:06:01.325] [egg_6] REPAIR TRIGGER
+[17:06:02.551] [egg_6] REPAIR REFRESH
+[17:06:02.600] [egg_8] LOCALISATION READY
+[17:06:02.613] [egg_6] LOCALISATION START
+[17:06:02.629] [egg_8] UWB ms:        8445
+[17:06:02.631] [egg_8] Settle ms:     8000
+[17:06:02.644] [egg_6] Reason:        repair
+[17:06:05.900] [egg_8] REPAIR TRIGGER
+[17:06:05.991] [egg_8] REPAIR REFRESH
+[17:06:06.082] [egg_8] LOCALISATION START
+[17:06:06.084] [egg_8] Reason:        repair
+[17:06:06.419] [egg_7] STATUS
+[17:06:06.478] [egg_7] Role:          field_egg
+[17:06:06.479] [egg_7] State:         READY
+[17:06:06.596] [egg_7] Position:      0.00, 0.00
+[17:06:09.727] [egg_6] LOCALISATION READY
+[17:06:09.754] [egg_6] UWB ms:        8443
+[17:06:09.755] [egg_6] Settle ms:     8000
+[17:06:12.725] [egg_6] REPAIR TRIGGER
+[17:06:12.817] [egg_6] REPAIR REFRESH
+[17:06:12.876] [egg_6] LOCALISATION START
+[17:06:12.936] [egg_6] Reason:        repair
+[17:06:13.161] [egg_8] LOCALISATION READY
+[17:06:13.190] [egg_8] UWB ms:        8362
+[17:06:13.218] [egg_8] Settle ms:     8000
+[17:06:13.948] [egg_7] STATUS
+[17:06:14.010] [egg_7] Role:          field_egg
+[17:06:14.011] [egg_7] State:         READY
+[17:06:14.095] [egg_7] Position:      0.00, 0.00
+[17:06:15.319] [egg_8] STATUS
+[17:06:15.352] [egg_8] Role:          field_egg
+[17:06:15.379] [egg_8] State:         SETTLE
+[17:06:15.439] [egg_8] Position:      0.00, 0.00
+[17:06:16.640] [egg_8] REPAIR TRIGGER
+[17:06:16.677] [egg_7] STATUS
+[17:06:16.708] [egg_7] Role:          field_egg
+[17:06:16.729] [egg_8] REPAIR REFRESH
+[17:06:16.738] [egg_7] State:         READY
+[17:06:16.791] [egg_8] LOCALISATION START
+[17:06:16.797] [egg_7] Position:      0.00, 0.00
+[17:06:16.821] [egg_8] Reason:        repair
+[17:06:20.009] [egg_6] LOCALISATION READY
+[17:06:20.015] [egg_6] UWB ms:        8362
+[17:06:20.044] [egg_6] Settle ms:     8000
+[17:06:21.845] [egg_6] STATUS
+[17:06:21.874] [egg_6] Role:          field_egg
+[17:06:21.904] [egg_6] State:         SETTLE
+[17:06:21.966] [egg_6] Position:      0.00, 0.00
+[17:06:23.166] [egg_6] REPAIR TRIGGER
+[17:06:23.253] [egg_6] REPAIR REFRESH
+[17:06:23.349] [egg_6] LOCALISATION START
+[17:06:23.350] [egg_6] Reason:        repair
+[17:06:23.899] [egg_8] LOCALISATION READY
+[17:06:23.929] [egg_8] UWB ms:        8362
+[17:06:23.930] [egg_8] Settle ms:     8000
+[17:06:24.418] [egg_7] STATUS
+[17:06:24.448] [egg_7] Role:          field_egg
+[17:06:24.478] [egg_7] State:         READY
+[17:06:24.565] [egg_7] Position:      0.00, 0.00
+[17:06:26.059] [egg_8] STATUS
+[17:06:26.089] [egg_8] Role:          field_egg
+[17:06:26.117] [egg_8] State:         SETTLE
+[17:06:26.179] [egg_8] Position:      0.00, 0.00
+[17:06:27.380] [egg_8] REPAIR TRIGGER
+[17:06:27.440] [egg_8] REPAIR REFRESH
+[17:06:27.531] [egg_8] LOCALISATION START
+[17:06:27.534] [egg_8] Reason:        repair
+[17:06:30.424] [egg_6] LOCALISATION READY
+[17:06:30.455] [egg_6] UWB ms:        8362
+[17:06:30.455] [egg_6] Settle ms:     8000
+[17:06:31.619] [egg_7] STATUS
+[17:06:31.648] [egg_7] Role:          field_egg
+[17:06:31.649] [egg_7] State:         READY
+[17:06:31.738] [egg_7] Position:      0.00, 0.00
+[17:06:32.255] [egg_6] STATUS
+[17:06:32.288] [egg_6] Role:          field_egg
+[17:06:32.316] [egg_6] State:         SETTLE
+[17:06:32.374] [egg_6] Position:      0.00, 0.00
+[17:06:32.639] [egg_7] STATUS
+[17:06:32.699] [egg_7] Role:          field_egg
+[17:06:32.700] [egg_7] State:         READY
+[17:06:32.789] [egg_7] Position:      0.00, 0.00
+[17:06:33.574] [egg_6] REPAIR TRIGGER
+[17:06:33.665] [egg_6] REPAIR REFRESH
+[17:06:33.727] [egg_6] LOCALISATION START
+[17:06:33.756] [egg_6] Reason:        repair
+[17:06:34.639] [egg_8] LOCALISATION READY
+[17:06:34.669] [egg_8] UWB ms:        8361
+[17:06:34.669] [egg_8] Settle ms:     8000
+[17:06:34.827] [egg_7] STATUS
+[17:06:34.889] [egg_7] Role:          field_egg
+[17:06:34.891] [egg_7] State:         READY
+[17:06:34.945] [egg_7] Position:      0.00, 0.00
+
+=== SESSION 2026-05-02 17:33:42 ===
+
+=== SESSION 2026-05-02 17:33:50 ===
+
+=== SESSION 2026-05-02 17:35:06 ===
+
+=== SESSION 2026-05-02 17:35:10 ===
