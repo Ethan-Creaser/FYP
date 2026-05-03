@@ -13,6 +13,7 @@ from neighbour_table import NeighbourTable
 from route_table import RouteTable
 
 _MAX_PENDING_PER_DST = 3   # max DATA packets buffered per destination while waiting for a route
+_UWB_SCAN_FRAMES     = 20
 
 
 class Node:
@@ -42,7 +43,12 @@ class Node:
         self._pending_data = {}
 
         # In-flight RREQ: target_id -> origin_seq we used for that RREQ
-        self._rreq_pending = {}
+        self._rreq_pending  = {}
+        self._rreq_sent_at  = {}   # target_id -> time.time() of last flood
+        self._rreq_attempts = {}   # target_id -> attempt count
+
+        # Deferred UWB job: set by _handle_app, executed by tick() in the main loop
+        self._uwb_pending = None   # (uwb_id, role, src) or None
 
     # ── Sequence numbers ──────────────────────────────────────────────────────
 
@@ -115,10 +121,40 @@ class Node:
         if target_id in self._rreq_pending:
             return
         seq = self.next_seq()
-        self._rreq_pending[target_id] = seq
+        self._rreq_pending[target_id]  = seq
+        self._rreq_sent_at[target_id]  = time.time()
+        self._rreq_attempts[target_id] = self._rreq_attempts.get(target_id, 0) + 1
         pkt = packets.make_rreq(src=self.node_id, seq=seq, target_id=target_id)
-        print("[{}] RREQ flood target={} seq={}".format(self.node_id, target_id, seq))
+        print("[{}] RREQ flood target={} seq={} attempt={}".format(
+            self.node_id, target_id, seq, self._rreq_attempts[target_id]))
         self.send_packet(pkt)
+
+    def tick(self):
+        """Call periodically from the main loop to expire and retry stale RREQs,
+        and to execute deferred UWB work outside the radio callback stack."""
+        if self._uwb_pending is not None:
+            uwb_id, role, src = self._uwb_pending
+            self._uwb_pending = None
+            try:
+                self.uwb.configure_warm(uwb_id, role)
+                print("[{}] UWB reconfigured ok".format(self.node_id))
+                self._scan_and_send_uwb(uwb_id, role, src)
+            except Exception as e:
+                print("[{}] UWB reconfigure failed: {}".format(self.node_id, e))
+
+        now = time.time()
+        for target_id in list(self._rreq_pending):
+            if now - self._rreq_sent_at.get(target_id, now) < constants.RREQ_TIMEOUT:
+                continue
+            attempts = self._rreq_attempts.get(target_id, 0)
+            del self._rreq_pending[target_id]
+            if attempts >= constants.RREQ_MAX_ATTEMPTS:
+                print("[{}] RREQ gave up target={}".format(self.node_id, target_id))
+                self._rreq_sent_at.pop(target_id, None)
+                self._rreq_attempts.pop(target_id, None)
+                self._pending_data.pop(target_id, None)
+            else:
+                self._flood_rreq(target_id)
 
     # ── Receiving ─────────────────────────────────────────────────────────────
 
@@ -181,8 +217,6 @@ class Node:
             return
 
         if pkt.kind == constants.KIND_DATA:
-            if self._seen_check(pkt):
-                return
             self._handle_data(pkt, from_id)
             return
 
@@ -261,21 +295,49 @@ class Node:
         print("[{}] DELIVER src={} app={} sub={} len={}".format(
             self.node_id, pkt.src, app_id, subtype, len(body)))
         if app_id == constants.APP_CTRL:
-            self._handle_app(subtype, body)
+            self._handle_app(subtype, body, src=pkt.src)
 
-    def _handle_app(self, subtype, body):
+    def _handle_app(self, subtype, body, src=None):
         if subtype == constants.CTRL_UWB_CONFIG and len(body) >= 2:
             uwb_id = body[0]
             role   = body[1]
             print("[{}] UWB config: uwb_id={} role={}".format(self.node_id, uwb_id, role))
             if self.uwb is not None:
-                try:
-                    self.uwb.configure_warm(uwb_id, role)
-                    print("[{}] UWB reconfigured ok".format(self.node_id))
-                except Exception as e:
-                    print("[{}] UWB reconfigure failed: {}".format(self.node_id, e))
+                self._uwb_pending = (uwb_id, role, src)
             else:
                 print("[{}] UWB not attached".format(self.node_id))
+
+        elif subtype == constants.CTRL_UWB_SCAN_RESULT and len(body) >= 2:
+            uwb_id = body[0]
+            role   = body[1]
+            i = 2
+            while i + 2 < len(body):
+                slot    = body[i]
+                dist_mm = (body[i + 1] << 8) | body[i + 2]
+                print("UWB_RESULT node={} uwb_id={} role={} slot={} dist={:.4f}".format(
+                    src if src is not None else "?", uwb_id, role, slot, dist_mm / 1000.0))
+                i += 3
+
+    def _scan_and_send_uwb(self, uwb_id, role, requester_id):
+        print("[{}] UWB scan ({} frames)...".format(self.node_id, _UWB_SCAN_FRAMES))
+        self.uwb.flush()
+        raw = self.uwb.scan(frames=_UWB_SCAN_FRAMES)
+
+        if not raw:
+            print("[{}] UWB scan: no data".format(self.node_id))
+            return
+
+        payload = bytearray([uwb_id, role])
+        for slot, dist in sorted(raw.items()):
+            print("[{}]   slot {} -> {:.4f} m".format(self.node_id, slot, dist))
+            dist_mm = min(int(dist * 1000), 0xFFFF)
+            payload.append(slot & 0xFF)
+            payload.append((dist_mm >> 8) & 0xFF)
+            payload.append(dist_mm & 0xFF)
+
+        dst = requester_id if requester_id is not None else constants.GROUND_STATION_ID
+        self.send_data(dst, constants.APP_CTRL, constants.CTRL_UWB_SCAN_RESULT, bytes(payload))
+        print("[{}] UWB scan sent to node {}".format(self.node_id, dst))
 
     # ── BCAST ─────────────────────────────────────────────────────────────────
 
@@ -360,6 +422,8 @@ class Node:
 
             # Clear the in-flight RREQ marker
             self._rreq_pending.pop(target_id, None)
+            self._rreq_sent_at.pop(target_id, None)
+            self._rreq_attempts.pop(target_id, None)
 
             # Send any DATA packets that were buffered waiting for this route
             pending = self._pending_data.pop(target_id, [])

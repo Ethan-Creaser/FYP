@@ -49,6 +49,7 @@ class HardwareRadio:
         }
         self.lora = ULoRa(spi, pins_map, parameters=params)
         self._bg_running = False
+        self._tx_queue = []   # bytes queued by main thread while bg thread owns the radio
         # LBT/CAD parameters (tunable via config.json -> "lbt" block)
         lbt_cfg = config.get("lbt", {})
         self.lbt_enabled = bool(lbt_cfg.get("enabled", True))
@@ -58,9 +59,15 @@ class HardwareRadio:
         self.backoff_max_ms = int(lbt_cfg.get("backoff_max_ms", 220))
 
     def send(self, data: bytes):
-        # transmit raw bytes
+        if self._bg_running:
+            # background thread owns the radio — queue and let it drain between listens
+            self._tx_queue.append(bytes(data))
+            return
+        self._do_send(data)
+
+    def _do_send(self, data):
         try:
-            print(f"[radio] TX len={len(data)}")
+            print("[radio] TX len={}".format(len(data)))
         except Exception:
             pass
         # Listen-before-talk: use CAD (channel activity detection) if enabled and available
@@ -74,10 +81,9 @@ class HardwareRadio:
                         busy = False
                     if busy:
                         try:
-                            print(f"[radio] CAD busy, backoff {attempt+1}/{attempts}")
+                            print("[radio] CAD busy, backoff {}/{}".format(attempt + 1, attempts))
                         except Exception:
                             pass
-                        # pick random backoff between configured min/max
                         try:
                             import random as _rand
                             backoff_ms = int(_rand.random() * (self.backoff_max_ms - self.backoff_min_ms)) + self.backoff_min_ms
@@ -91,7 +97,6 @@ class HardwareRadio:
                                     backoff_ms = (_ut.ticks_ms() % (self.backoff_max_ms - self.backoff_min_ms)) + self.backoff_min_ms
                                 except Exception:
                                     backoff_ms = (self.backoff_min_ms + self.backoff_max_ms) // 2
-                        # sleep for backoff_ms if possible
                         try:
                             import utime as _ut
                             _ut.sleep_ms(backoff_ms)
@@ -101,12 +106,9 @@ class HardwareRadio:
                                 _t.sleep(backoff_ms / 1000.0)
                             except Exception:
                                 pass
-                        # try CAD again
                         continue
-                    # channel clear, proceed to send
                     break
         except Exception:
-            # if CAD check fails, continue with blind send
             pass
 
         self.lora.begin_packet()
@@ -114,6 +116,9 @@ class HardwareRadio:
         self.lora.end_packet()
 
     def poll(self, timeout_ms: int = 500):
+        # drain any sends queued by the main thread before listening
+        while self._tx_queue:
+            self._do_send(self._tx_queue.pop(0))
         # blocking listen for up to timeout_ms; if payload found, deliver to node
         payload = self.lora.listen(timeout=timeout_ms)
         if payload:

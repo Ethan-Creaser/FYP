@@ -4,8 +4,8 @@ Edit `NODE_ID`/`UWB_ID` below then run this script on the target device
 or via your flashing tool to persist the identity file.
 """
 
-NODE_ID = 7
-UWB_ID = 7
+NODE_ID = 6
+UWB_ID = 6
 
 def _main():
     print("Writing identity: node_id={} uwb_id={}".format(NODE_ID, UWB_ID))

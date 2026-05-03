@@ -168,6 +168,9 @@ def main():
                 except Exception as e:
                     print("radio poll error:", e)
 
+            # retry / expire stale RREQs
+            node.tick()
+
             # process any BLE RX buffered from the IRQ
             if getattr(node, "bt_logger", None):
                 node.bt_logger.poll()

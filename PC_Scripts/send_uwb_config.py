@@ -5,7 +5,8 @@ Usage:
 
 Flow:
     PC --[BLE NUS write]--> gateway egg --[LoRa mesh]--> target egg
-    The target egg reconfigures its UWB module at runtime (identity.bin is not changed).
+    Target reconfigures UWB, scans, sends results back via LoRa --> gateway --> BLE --> PC
+    PC writes scan results to uwb_scan.csv
 
 Requires:
     pip install bleak
@@ -13,7 +14,10 @@ Requires:
 
 import argparse
 import asyncio
+import csv
+import os
 import sys
+import time as _time
 
 try:
     from bleak import BleakScanner, BleakClient
@@ -27,12 +31,30 @@ NUS_TX_UUID  = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  # egg → PC
 CMD_UWB      = 0xCF   # must match _BT_CMD_UWB in main.py
 SCAN_TIMEOUT = 10.0
 
+_CSV_PATH   = "uwb_scan.csv"
+_CSV_HEADER = ["pc_timestamp_ms", "node_id", "uwb_id", "role", "slot", "distance_m"]
+
 _notify_buf = ""
+_csv_rows   = []
+
+
+def _parse_uwb_result(line):
+    # UWB_RESULT node=3 uwb_id=1 role=1 slot=0 dist=1.2345
+    try:
+        parts = {}
+        for token in line.split()[1:]:
+            k, v = token.split("=")
+            parts[k] = v
+        ts = int(_time.time() * 1000)
+        return [ts, int(parts["node"]), int(parts["uwb_id"]),
+                int(parts["role"]), int(parts["slot"]), float(parts["dist"])]
+    except Exception:
+        return None
 
 
 def _on_notify(sender, data):
     """Reassemble 20-byte BLE chunks into complete lines before printing."""
-    global _notify_buf
+    global _notify_buf, _csv_rows
     try:
         _notify_buf += data.decode("utf-8")
     except Exception:
@@ -40,8 +62,26 @@ def _on_notify(sender, data):
     while "\n" in _notify_buf:
         line, _notify_buf = _notify_buf.split("\n", 1)
         line = line.rstrip()
-        if line:
-            print("[egg]", line)
+        if not line:
+            continue
+        print("[egg]", line)
+        if line.startswith("UWB_RESULT "):
+            row = _parse_uwb_result(line)
+            if row:
+                _csv_rows.append(row)
+
+
+def _write_csv(rows):
+    if not rows:
+        print("No UWB scan results received.")
+        return
+    write_header = not os.path.exists(_CSV_PATH)
+    with open(_CSV_PATH, "a", newline="") as f:
+        w = csv.writer(f)
+        if write_header:
+            w.writerow(_CSV_HEADER)
+        w.writerows(rows)
+    print("Logged {} measurement(s) to {}".format(len(rows), _CSV_PATH))
 
 
 def prompt_int(prompt, lo, hi):
@@ -80,8 +120,8 @@ async def send_uwb_config(via_name, target_egg_id, uwb_id, role):
         print("Command sent — {} forwarding uwb_id={} role={} to egg_{}".format(
             via_name, uwb_id, role, target_egg_id))
 
-        # wait for the mesh to deliver and the target to confirm
-        await asyncio.sleep(3.0)
+        # wait for: LoRa delivery + UWB scan + LoRa return trip
+        await asyncio.sleep(20.0)
         await client.stop_notify(NUS_TX_UUID)
 
     print("\nDone.")
@@ -120,6 +160,7 @@ def main():
         sys.exit(0)
 
     ok = asyncio.run(send_uwb_config(args.name, target_egg_id, uwb_id, role))
+    _write_csv(_csv_rows)
     sys.exit(0 if ok else 1)
 
 
