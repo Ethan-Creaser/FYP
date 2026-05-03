@@ -50,3 +50,6 @@ APP_THERM    = 3
 ROUTING_RREQ     = 1
 ROUTING_RREP     = 2
 ROUTING_RECOVERY = 3
+
+# ── APP_CTRL subtypes ─────────────────────────────────────────────────────────
+CTRL_UWB_CONFIG = 1   # payload: [uwb_id, role]

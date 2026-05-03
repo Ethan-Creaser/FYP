@@ -22,6 +22,7 @@ class Node:
         self.routes     = RouteTable()
         self.network    = None        # set by SimNetwork.register_node
         self.radio      = None        # set by attach_hardware_from_config
+        self.uwb        = None        # set by main.py if use_uwb
         self.start_time = time.time()
 
         self._seq       = 1
@@ -259,13 +260,22 @@ class Node:
     def _deliver_to_app(self, pkt, app_id, subtype, body):
         print("[{}] DELIVER src={} app={} sub={} len={}".format(
             self.node_id, pkt.src, app_id, subtype, len(body)))
-        bt = getattr(self, "bt_logger", None)
-        if bt:
-            try:
-                bt.log("RX src={} app={} sub={} seq={}".format(
-                    pkt.src, app_id, subtype, pkt.seq))
-            except Exception:
-                pass
+        if app_id == constants.APP_CTRL:
+            self._handle_app(subtype, body)
+
+    def _handle_app(self, subtype, body):
+        if subtype == constants.CTRL_UWB_CONFIG and len(body) >= 2:
+            uwb_id = body[0]
+            role   = body[1]
+            print("[{}] UWB config: uwb_id={} role={}".format(self.node_id, uwb_id, role))
+            if self.uwb is not None:
+                try:
+                    self.uwb.configure_warm(uwb_id, role)
+                    print("[{}] UWB reconfigured ok".format(self.node_id))
+                except Exception as e:
+                    print("[{}] UWB reconfigure failed: {}".format(self.node_id, e))
+            else:
+                print("[{}] UWB not attached".format(self.node_id))
 
     # ── BCAST ─────────────────────────────────────────────────────────────────
 
