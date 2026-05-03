@@ -4,6 +4,7 @@
   "ground_station_id": 99,
 
   "use_hardware": true,
+  "use_bluetooth": true,
   "hw_test_enabled": true,
   "hw_test_target": 1,
   "hw_test_interval_s": 6,

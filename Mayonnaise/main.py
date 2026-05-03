@@ -77,9 +77,20 @@ def main():
             print("OLED import failed:", e)
             display = None
 
+        # attach BLE logger if enabled
+        if cfg.get("use_bluetooth"):
+            try:
+                from Drivers.bt.bt_logger import BtLogger
+                bt_name = cfg.get("bt_name") or "egg_{}".format(node_id)
+                node.bt_logger = BtLogger(name=bt_name)
+                print("BT logger started as", bt_name)
+            except Exception as e:
+                print("BT logger init failed:", e)
+
         # production: no periodic hardware test in main.py (use Debug/hw_runner.py)
-        beacon_interval = getattr(constants, "BEACON_INTERVAL", 30)
-        next_beacon = time.time()
+
+    beacon_interval = getattr(constants, "BEACON_INTERVAL", 30)
+    next_beacon = time.time()
 
     try:
         while True:

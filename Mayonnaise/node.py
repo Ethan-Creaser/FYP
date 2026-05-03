@@ -70,14 +70,26 @@ class Node:
         # hops_to_ground unknown (255)
         pkt = packets.make_beacon(src=self.node_id, seq=seq, hops_to_ground=None)
         print(f"[node {self.node_id}] send_beacon seq={seq}")
+        bt = getattr(self, "bt_logger", None)
+        if bt:
+            try:
+                nei = len(self.neighbours.get_alive())
+                bt.log("BCN seq={} nei={}".format(seq, nei))
+            except Exception:
+                pass
         self.send_packet(pkt)
 
-    def send_data(self, dst: int, app_id: int, subtype: int, data: bytes = b"", ttl: int = constants.MAX_TTL):
+    def send_data(self, dst, app_id, subtype, data=b"", ttl=constants.MAX_TTL):
         seq = self.next_seq()
         pkt = packets.make_data(src=self.node_id, dst=dst, seq=seq, ttl=ttl, app_id=app_id, subtype=subtype, data=data)
         # mark as outstanding so origin can detect final ACK
         self.outstanding[(self.node_id, seq)] = time.time()
-        # production: no-op for CSV logging (debug logger moved to Debug/)
+        bt = getattr(self, "bt_logger", None)
+        if bt:
+            try:
+                bt.log("TX dst={} app={} sub={} seq={}".format(dst, app_id, subtype, seq))
+            except Exception:
+                pass
         # try route first
         next_hop = self.routes.get_next_hop(dst)
         try:
@@ -148,6 +160,12 @@ class Node:
             # payload may contain hops_to_ground
             if pkt.payload and pkt.payload[0] != 255:
                 self.neighbours.update(pkt.src, rssi=None, snr=None, hops_to_ground=int(pkt.payload[0]))
+            bt = getattr(self, "bt_logger", None)
+            if bt:
+                try:
+                    bt.log("HEAR src={} seq={}".format(pkt.src, pkt.seq))
+                except Exception:
+                    pass
             return
 
         if pkt.kind == constants.KIND_ACK:
@@ -167,6 +185,12 @@ class Node:
                 except Exception:
                     app_id, subtype, body = (None, None, pkt.payload)
                 print(f"[node {self.node_id}] DATA from {pkt.src} seq={pkt.seq} app={app_id} subtype={subtype} body={body}")
+                bt = getattr(self, "bt_logger", None)
+                if bt:
+                    try:
+                        bt.log("RX src={} app={} sub={} seq={}".format(pkt.src, app_id, subtype, pkt.seq))
+                    except Exception:
+                        pass
                 # send ACK back to the neighbour we received from (prefer physical from_id if present)
                 ack_dst = from_id if from_id is not None else pkt.src
                 try:
