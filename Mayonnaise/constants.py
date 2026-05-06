@@ -54,3 +54,4 @@ ROUTING_RECOVERY = 3
 # ── APP_CTRL subtypes ─────────────────────────────────────────────────────────
 CTRL_UWB_CONFIG      = 1   # payload: [uwb_id, role]
 CTRL_UWB_SCAN_RESULT = 2   # payload: [uwb_id, role, slot, dist_mm_hi, dist_mm_lo, ...]
+CTRL_UWB_RESTORE     = 3   # payload: [] — egg reverts to its identity.bin uwb_id, role=1

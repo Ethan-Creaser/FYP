@@ -93,6 +93,7 @@ def main():
                 )
                 initial_role = 0 if (uwb_id or 0) == 0 else 1
                 node.uwb.configure_warm(uwb_id or 0, initial_role)
+                node.uwb_default_id = uwb_id or 0
                 print("UWB attached: id={} role={}".format(uwb_id, initial_role))
             except Exception as e:
                 print("UWB init failed:", e)
@@ -118,25 +119,46 @@ def main():
                         pass
                 builtins.print = _tee_print
 
-                # handle UWB config command from the PC
-                # payload: [0xCF, target_egg_id, uwb_id, role]
-                _BT_CMD_UWB = 0xCF
+                # BLE command bytes from the PC
+                # 0xCF [target_id, uwb_id, role]  → UWB config (reconfigure + scan)
+                # 0xD0 [target_id]                → UWB restore to identity.bin default
+                _BT_CMD_UWB         = 0xCF
+                _BT_CMD_UWB_RESTORE = 0xD0
                 def _bt_rx(data):
-                    if len(data) < 4 or data[0] != _BT_CMD_UWB:
-                        print("BT: unknown command:", list(data))
+                    if not data:
                         return
-                    target_id = data[1]
-                    uwb_id_cmd = data[2]
-                    role       = data[3]
-                    print("BT CMD: target={} uwb_id={} role={}".format(
-                        target_id, uwb_id_cmd, role))
-                    node.send_data(
-                        target_id,
-                        constants.APP_CTRL,
-                        constants.CTRL_UWB_CONFIG,
-                        bytes([uwb_id_cmd, role]),
-                    )
-                    print("UWB config sent to egg_{}".format(target_id))
+                    cmd = data[0]
+                    if cmd == _BT_CMD_UWB:
+                        if len(data) < 4:
+                            print("BT: UWB config too short:", list(data))
+                            return
+                        target_id  = data[1]
+                        uwb_id_cmd = data[2]
+                        role       = data[3]
+                        print("BT CMD UWB_CONFIG: target={} uwb_id={} role={}".format(
+                            target_id, uwb_id_cmd, role))
+                        node.send_data(
+                            target_id,
+                            constants.APP_CTRL,
+                            constants.CTRL_UWB_CONFIG,
+                            bytes([uwb_id_cmd, role]),
+                        )
+                        print("UWB config sent to egg_{}".format(target_id))
+                    elif cmd == _BT_CMD_UWB_RESTORE:
+                        if len(data) < 2:
+                            print("BT: UWB restore too short:", list(data))
+                            return
+                        target_id = data[1]
+                        print("BT CMD UWB_RESTORE: target={}".format(target_id))
+                        node.send_data(
+                            target_id,
+                            constants.APP_CTRL,
+                            constants.CTRL_UWB_RESTORE,
+                            b"",
+                        )
+                        print("UWB restore sent to egg_{}".format(target_id))
+                    else:
+                        print("BT: unknown command:", list(data))
 
                 _bt.on_rx = _bt_rx
                 print("BT logger started as", bt_name)

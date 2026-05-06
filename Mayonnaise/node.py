@@ -106,6 +106,16 @@ class Node:
         self.outstanding[(self.node_id, seq)] = time.time()
 
         next_hop = self.routes.get_next_hop(dst)
+
+        # Fallback: if the route table has expired or never learned this dest,
+        # check whether it is a live direct neighbour and shortcut straight to it.
+        if next_hop is None:
+            nb = self.neighbours.get(dst)
+            if nb and nb.is_alive:
+                next_hop = dst
+                # Cache the direct route so we don't repeat this check.
+                self.routes.set_route(dst, dst, 1)
+
         print("[{}] SEND dst={} seq={} next_hop={}".format(self.node_id, dst, seq, next_hop))
 
         if next_hop is not None:
@@ -135,12 +145,27 @@ class Node:
         if self._uwb_pending is not None:
             uwb_id, role, src = self._uwb_pending
             self._uwb_pending = None
-            try:
-                self.uwb.configure_warm(uwb_id, role)
-                print("[{}] UWB reconfigured ok".format(self.node_id))
-                self._scan_and_send_uwb(uwb_id, role, src)
-            except Exception as e:
-                print("[{}] UWB reconfigure failed: {}".format(self.node_id, e))
+            if uwb_id is None:
+                # Restore command: revert to identity.bin default uwb_id, role=1 (anchor)
+                default_id = getattr(self, "uwb_default_id", None)
+                if default_id is not None:
+                    print("[{}] UWB restoring to uwb_id={} role=1 (anchor)".format(
+                        self.node_id, default_id))
+                    try:
+                        self.uwb.configure_warm(default_id, 1)
+                        print("[{}] UWB restored ok".format(self.node_id))
+                    except Exception as e:
+                        print("[{}] UWB restore failed: {}".format(self.node_id, e))
+                else:
+                    print("[{}] UWB restore: no default id stored".format(self.node_id))
+            else:
+                # Configure command: set new uwb_id/role, then scan and report
+                try:
+                    self.uwb.configure_warm(uwb_id, role)
+                    print("[{}] UWB reconfigured ok".format(self.node_id))
+                    self._scan_and_send_uwb(uwb_id, role, src)
+                except Exception as e:
+                    print("[{}] UWB reconfigure failed: {}".format(self.node_id, e))
 
         now = time.time()
         for target_id in list(self._rreq_pending):
@@ -174,8 +199,11 @@ class Node:
 
         from_id = pkt.sender_id
 
-        # Every received packet refreshes the sender's neighbour entry.
+        # Every received packet refreshes the sender's neighbour entry and
+        # installs a direct 1-hop route.  Receiving a packet is proof that
+        # from_id is reachable in one hop — no RREQ/RREP needed for it.
         self.neighbours.update(from_id, rssi=rssi, snr=snr)
+        self.routes.set_route(from_id, from_id, 1)
 
         # Update OLED/display if attached
         disp = getattr(self, "display", None)
@@ -231,6 +259,9 @@ class Node:
     def _handle_beacon(self, pkt):
         h = int(pkt.payload[0]) if pkt.payload else 255
         self.neighbours.update(pkt.src, hops_to_ground=(None if h == 255 else h))
+        # Every beacon proves a direct 1-hop link — cache it so we never need
+        # RREQ/RREP to reach a direct neighbour.
+        self.routes.set_route(pkt.src, pkt.src, 1)
         print("[{}] BEACON from={} hops_to_ground={}".format(self.node_id, pkt.src, h))
 
     def _compute_hops_to_ground(self):
@@ -304,6 +335,14 @@ class Node:
             print("[{}] UWB config: uwb_id={} role={}".format(self.node_id, uwb_id, role))
             if self.uwb is not None:
                 self._uwb_pending = (uwb_id, role, src)
+            else:
+                print("[{}] UWB not attached".format(self.node_id))
+
+        elif subtype == constants.CTRL_UWB_RESTORE:
+            print("[{}] UWB restore command received".format(self.node_id))
+            if self.uwb is not None:
+                # uwb_id=None signals tick() to restore from identity
+                self._uwb_pending = (None, 1, src)
             else:
                 print("[{}] UWB not attached".format(self.node_id))
 

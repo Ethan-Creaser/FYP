@@ -75,7 +75,7 @@ def _write_csv(rows):
     if not rows:
         print("No UWB scan results received.")
         return
-    write_header = not os.path.exists(_CSV_PATH)
+    write_header = not os.path.exists(_CSV_PATH) or os.path.getsize(_CSV_PATH) == 0
     with open(_CSV_PATH, "a", newline="") as f:
         w = csv.writer(f)
         if write_header:
