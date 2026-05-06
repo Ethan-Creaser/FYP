@@ -34,6 +34,9 @@ class NeighbourTable:
         self._entries = {}
         self.allowlist = set(allowlist) if allowlist else None
 
+    def is_allowed(self, node_id):
+        return self.allowlist is None or node_id in self.allowlist
+
     def update(self, node_id, rssi=None, snr=None, hops_to_ground=None):
         if self.allowlist is not None and node_id not in self.allowlist:
             # ignore links not in allowlist when testing
@@ -62,6 +65,16 @@ class NeighbourTable:
 
     def get(self, node_id):
         return self._entries.get(node_id)
+
+    def get_newly_lost(self):
+        """Return node_ids that just transitioned alive->lost and mark them lost."""
+        now = time.time()
+        lost = []
+        for nid, e in list(self._entries.items()):
+            if e.is_alive and (now - e.last_seen) > constants.LOST_TIMEOUT:
+                e.is_alive = False
+                lost.append(nid)
+        return lost
 
     def prune_stale(self):
         now = time.time()

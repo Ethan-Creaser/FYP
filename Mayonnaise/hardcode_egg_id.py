@@ -1,25 +1,47 @@
-"""Utility to write `identity.bin` for flashing eggs.
+"""Set the permanent node identity for one egg.
 
-Edit `NODE_ID`/`UWB_ID` below then run this script on the target device
-or via your flashing tool to persist the identity file.
+Option 1 — edit the variables below and run this file:
+    NODE_ID = 3
+    UWB_ID  = 3
+
+Option 2 — call from the MicroPython REPL without editing:
+    import hardcode_egg_id
+    hardcode_egg_id.set_id(3)
+    hardcode_egg_id.set_id(3, uwb_id=1)  # if uwb_id differs from node_id
+
+Node ID assignments:
+    1-14  mesh eggs
+    99    ground station
+    uwb_id must be 0-7 (only 8 UWB slots on BU03 hardware)
 """
 
-NODE_ID = 7
-UWB_ID = 7
+# ── Edit these before running ─────────────────────────────────────────────────
+NODE_ID = 2
+UWB_ID  = 2
+# ─────────────────────────────────────────────────────────────────────────────
 
-def _main():
-    print("Writing identity: node_id={} uwb_id={}".format(NODE_ID, UWB_ID))
-    try:
-        from identity import write_identity, read_identity
-        write_identity(NODE_ID, UWB_ID)
-        data = read_identity()
-        if data and data[0] == NODE_ID and data[1] == UWB_ID:
-            print("Verified OK: node_id={} uwb_id={}".format(data[0], data[1]))
-        else:
-            print("VERIFY FAILED: read back {}".format(data))
-    except Exception as e:
-        print("Failed to write identity:", e)
+from identity import write_identity, read_identity
 
 
-if __name__ == '__main__':
-    _main()
+def set_id(node_id, uwb_id=None):
+    if uwb_id is None:
+        uwb_id = node_id
+    write_identity(node_id, uwb_id)
+    data = read_identity()
+    if data and data[0] == node_id and data[1] == uwb_id:
+        print("Identity set: node_id={} uwb_id={}".format(node_id, uwb_id))
+    else:
+        print("VERIFY FAILED: read back {}".format(data))
+
+
+def read():
+    """Print what is currently stored in identity.bin."""
+    data = read_identity()
+    if data:
+        print("node_id={} uwb_id={}".format(data[0], data[1]))
+    else:
+        print("No identity.bin found")
+
+
+if __name__ == "__main__":
+    set_id(NODE_ID, UWB_ID)

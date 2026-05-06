@@ -96,7 +96,7 @@ class Node:
             src=self.node_id, dst=dst, seq=seq, ttl=ttl,
             app_id=app_id, subtype=subtype, data=data
         )
-        self.outstanding[(self.node_id, seq)] = time.time()
+        self.outstanding[(self.node_id, seq)] = [time.time(), pkt, dst, 1]
 
         next_hop = self.routes.get_next_hop(dst)
         print("[{}] SEND dst={} seq={} next_hop={}".format(self.node_id, dst, seq, next_hop))
@@ -114,7 +114,7 @@ class Node:
         if target_id in self._rreq_pending:
             return
         seq = self.next_seq()
-        self._rreq_pending[target_id] = seq
+        self._rreq_pending[target_id] = [seq, time.time(), 1]
         pkt = packets.make_rreq(src=self.node_id, seq=seq, target_id=target_id)
         print("[{}] RREQ flood target={} seq={}".format(self.node_id, target_id, seq))
         self.send_packet(pkt)
@@ -136,6 +136,10 @@ class Node:
             return
 
         from_id = pkt.sender_id
+
+        # Enforce topology allowlist — drop packets from senders outside it.
+        if not self.neighbours.is_allowed(from_id):
+            return
 
         # Every received packet refreshes the sender's neighbour entry.
         self.neighbours.update(from_id, rssi=rssi, snr=snr)
@@ -181,6 +185,13 @@ class Node:
 
         if pkt.kind == constants.KIND_DATA:
             if self._seen_check(pkt):
+                # Duplicate — re-ACK if we are the destination so sender can clear retry
+                if pkt.dst == self.node_id:
+                    ack = packets.make_ack(
+                        src=self.node_id, dst=from_id,
+                        orig_src=pkt.src, orig_seq=pkt.seq
+                    )
+                    self.send_packet(ack)
                 return
             self._handle_data(pkt, from_id)
             return
@@ -333,7 +344,7 @@ class Node:
             hop_count=hop_count,
         )
         print("[{}] RREP -> origin={} hops={}".format(self.node_id, origin_id, hop_count))
-        self.outstanding[(self.node_id, seq)] = time.time()
+        self.outstanding[(self.node_id, seq)] = [time.time(), pkt, origin_id, 1]
         self.send_packet(pkt)
 
     def _handle_routing_data(self, subtype, body, from_id):
@@ -390,6 +401,69 @@ class Node:
             orig_src=orig_src, orig_seq=orig_seq
         )
         self.send_packet(ack)
+
+    # ── Periodic maintenance ──────────────────────────────────────────────────
+
+    def tick(self):
+        """Call periodically (e.g. every 5 s) to age neighbours, retry packets,
+        and retransmit stale RREQs."""
+        self._age_neighbours()
+        self._check_outstanding()
+        self._check_rreq_timeouts()
+
+    def _age_neighbours(self):
+        for node_id in self.neighbours.get_newly_lost():
+            print("[{}] LOST neighbour={}".format(self.node_id, node_id))
+            self.routes.invalidate_next_hop(node_id)
+            self._flood_recovery(node_id)
+
+    def _flood_recovery(self, lost_id):
+        seq = self.next_seq()
+        pkt = packets.make_recovery(src=self.node_id, seq=seq, lost_node_id=lost_id)
+        print("[{}] RECOVERY flood lost={}".format(self.node_id, lost_id))
+        self.send_packet(pkt)
+
+    def _check_outstanding(self):
+        now = time.time()
+        for key in list(self.outstanding.keys()):
+            entry = self.outstanding[key]
+            sent_time, pkt, dst, attempts = entry[0], entry[1], entry[2], entry[3]
+            if now - sent_time < constants.HOP_ACK_TIMEOUT:
+                continue
+            if attempts < constants.MAX_HOP_RETRIES:
+                entry[0] = now
+                entry[3] += 1
+                print("[{}] retry seq={} dst={} attempt={}".format(
+                    self.node_id, key[1], dst, entry[3]))
+                self.send_packet(pkt)
+            else:
+                print("[{}] give up seq={} dst={} — penalising route".format(
+                    self.node_id, key[1], dst))
+                self.routes.penalize(dst)
+                del self.outstanding[key]
+                self._flood_rreq(dst)
+
+    def _check_rreq_timeouts(self):
+        now = time.time()
+        for target_id in list(self._rreq_pending.keys()):
+            entry = self._rreq_pending[target_id]
+            seq, sent_time, attempts = entry[0], entry[1], entry[2]
+            if now - sent_time < constants.RREQ_TIMEOUT:
+                continue
+            if attempts < constants.RREQ_MAX_ATTEMPTS:
+                new_seq = self.next_seq()
+                entry[0] = new_seq
+                entry[1] = now
+                entry[2] += 1
+                pkt = packets.make_rreq(src=self.node_id, seq=new_seq, target_id=target_id)
+                print("[{}] RREQ retry target={} seq={} attempt={}".format(
+                    self.node_id, target_id, new_seq, entry[2]))
+                self.send_packet(pkt)
+            else:
+                print("[{}] RREQ failed target={} — dropping buffered data".format(
+                    self.node_id, target_id))
+                del self._rreq_pending[target_id]
+                self._pending_data.pop(target_id, None)
 
     # ── Hardware attach ───────────────────────────────────────────────────────
 

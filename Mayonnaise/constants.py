@@ -9,6 +9,7 @@ LOST_TIMEOUT    = 150
 # Routing / packets
 MAX_TTL              = 6
 DEFAULT_ROUTE_TTL_MS = 300_000   # 5 minutes
+HOP_ACK_TIMEOUT      = 5         # seconds before retrying an unACKed hop
 MAX_HOP_RETRIES      = 3
 RREQ_TIMEOUT         = 3         # seconds to wait for RREP before retrying
 RREQ_MAX_ATTEMPTS    = 2         # max RREQ floods before giving up on a destination

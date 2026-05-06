@@ -28,6 +28,21 @@ except Exception:
     HAVE_HW = False
 
 
+_KIND_NAMES = {1: "BCN", 2: "DATA", 3: "BCAST", 4: "ACK"}
+
+
+def _pkt_info(data):
+    if len(data) < 9:
+        return "len={}".format(len(data))
+    kind   = _KIND_NAMES.get(data[1], "?{}".format(data[1]))
+    src    = data[2]
+    dst    = "ALL" if data[3] == 255 else str(data[3])
+    sender = data[4]
+    seq    = (data[5] << 8) | data[6]
+    return "kind={} src={} dst={} sender={} seq={} len={}".format(
+        kind, src, dst, sender, seq, len(data))
+
+
 class HardwareRadio:
     def __init__(self, node, config: dict):
         if not HAVE_HW:
@@ -60,7 +75,7 @@ class HardwareRadio:
     def send(self, data: bytes):
         # transmit raw bytes
         try:
-            print(f"[radio] TX len={len(data)}")
+            print("[radio] TX " + _pkt_info(data))
         except Exception:
             pass
         # Listen-before-talk: use CAD (channel activity detection) if enabled and available
@@ -126,7 +141,7 @@ class HardwareRadio:
             except Exception:
                 snr = None
             try:
-                print(f"[radio] RX len={len(payload)} rssi={rssi} snr={snr}")
+                print("[radio] RX {} rssi={} snr={}".format(_pkt_info(payload), rssi, snr))
             except Exception:
                 pass
             # from_id isn't known at radio-level; node will parse pkt.src

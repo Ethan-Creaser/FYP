@@ -114,8 +114,9 @@ def main():
                 seq = node.next_seq()
                 payload = b"hw_test"
                 pkt = packets.make_data(src=node.node_id, dst=target, seq=seq, ttl=constants.MAX_TTL, app_id=constants.APP_CTRL, subtype=1, data=payload)
-                node.outstanding[(node.node_id, seq)] = time.time()
+                node.outstanding[(node.node_id, seq)] = [time.time(), pkt, target, 1]
                 test_state[seq] = {"pkt": pkt, "sent_time": time.time(), "attempts": 1}
+                print("hw_runner: TX seq={} dst={}".format(seq, target))
                 try:
                     node.send_packet(pkt)
                 except Exception as e:

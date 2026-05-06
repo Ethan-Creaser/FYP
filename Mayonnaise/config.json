@@ -1,12 +1,11 @@
 {
-  "node_id": 1,
-  "node_name": "egg_1",
+  "node_id": null,
   "ground_station_id": 99,
 
   "use_hardware": true,
   "use_bluetooth": true,
   "hw_test_enabled": true,
-  "hw_test_target": 2,
+  "hw_test_target": 3,
   "hw_test_interval_s": 15,
   "hw_test_ack_timeout_s": 8,
   "hw_test_max_retries": 2,

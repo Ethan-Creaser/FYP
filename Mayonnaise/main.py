@@ -20,6 +20,10 @@ import packets
 
 from node import Node
 import constants
+try:
+    from version import VERSION
+except Exception:
+    VERSION = "unknown"
 
 
 def main():
@@ -89,13 +93,34 @@ def main():
 
         # production: no periodic hardware test in main.py (use Debug/hw_runner.py)
 
+    radio_ok = getattr(node, "radio", None) is not None
+    bg_ok    = getattr(getattr(node, "radio", None), "_bg_running", False)
+    bt_ok    = getattr(node, "bt_logger", None) is not None
+    oled_ok  = getattr(node, "display", None) is not None
+    print("=" * 40)
+    print("Mayonnaise mesh  v{}".format(VERSION))
+    print("node={} uwb={}".format(node_id, uwb_id))
+    print("radio={}  bg={}  bt={}  oled={}".format(
+        "OK" if radio_ok else "FAIL",
+        "OK" if bg_ok    else "OFF",
+        "OK" if bt_ok    else "OFF",
+        "OK" if oled_ok  else "OFF",
+    ))
+    print("=" * 40)
+
     beacon_interval = getattr(constants, "BEACON_INTERVAL", 30)
     beacon_jitter   = getattr(constants, "BEACON_JITTER", 5)
     next_beacon = time.time()
+    next_tick   = time.time() + 5
 
     try:
         while True:
             now = time.time()
+
+            if now >= next_tick:
+                node.tick()
+                next_tick = now + 5
+
             if now >= next_beacon:
                 # Beacon suppression: if we transmitted anything within the last
                 # beacon_interval seconds, neighbours already know we are alive.
