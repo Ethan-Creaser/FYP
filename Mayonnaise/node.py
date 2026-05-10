@@ -20,9 +20,12 @@ class Node:
         self.node_id    = node_id
         self.neighbours = NeighbourTable(allowlist=allowlist)
         self.routes     = RouteTable()
-        self.network    = None        # set by SimNetwork.register_node
-        self.radio      = None        # set by attach_hardware_from_config
-        self.start_time = time.time()
+        self.network       = None     # set by SimNetwork.register_node
+        self.radio         = None     # set by attach_hardware_from_config
+        self.display       = None     # set by main if OLED is present
+        self.bt_logger     = None     # set by main if BT is enabled
+        self.localise_app  = None     # set by LocaliseApp.__init__
+        self.start_time    = time.time()
 
         self._seq       = 1
         self._last_tx_time = 0        # updated on every send; used for beacon suppression
@@ -270,6 +273,16 @@ class Node:
     def _deliver_to_app(self, pkt, app_id, subtype, body):
         print("[{}] DELIVER src={} app={} sub={} len={}".format(
             self.node_id, pkt.src, app_id, subtype, len(body)))
+
+        if app_id == constants.APP_LOCALISE:
+            loc = getattr(self, "localise_app", None)
+            if loc:
+                try:
+                    loc.on_rx(pkt.src, subtype, body)
+                except Exception as e:
+                    print("[{}] localise on_rx error: {}".format(self.node_id, e))
+            return
+
         bt = getattr(self, "bt_logger", None)
         if bt:
             try:

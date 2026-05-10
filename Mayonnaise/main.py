@@ -16,7 +16,6 @@ except Exception:
 
 import json
 import random
-import packets
 
 from node import Node
 import constants
@@ -90,6 +89,15 @@ def main():
                 print("BT logger started as", bt_name)
             except Exception as e:
                 print("BT logger init failed:", e)
+
+        # attach localisation app if enabled
+        if cfg.get("localisation_enabled"):
+            try:
+                from app_localise import LocaliseApp
+                LocaliseApp(node)
+                print("Localisation app attached")
+            except Exception as e:
+                print("Localisation app init failed:", e)
 
         # production: no periodic hardware test in main.py (use Debug/hw_runner.py)
 
