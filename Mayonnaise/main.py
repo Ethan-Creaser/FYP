@@ -80,27 +80,6 @@ def main():
             print("OLED import failed:", e)
             display = None
 
-        # attach UWB module if enabled
-        if cfg.get("use_uwb"):
-            try:
-                from Drivers.uwb.bu03 import BU03
-                p = cfg.get("uwb_pins", {})
-                node.uwb = BU03(
-                    data_uart_id   = p.get("data_uart_id",   1),
-                    data_tx        = p.get("data_tx",        17),
-                    data_rx        = p.get("data_rx",        18),
-                    config_uart_id = p.get("config_uart_id", 2),
-                    config_tx      = p.get("config_tx",      2),
-                    config_rx      = p.get("config_rx",      1),
-                    reset_pin      = p.get("reset_pin",      15),
-                )
-                initial_role = 0 if (uwb_id or 0) == 0 else 1
-                node.uwb.configure_warm(uwb_id or 0, initial_role)
-                node.uwb_default_id = uwb_id or 0
-                print("UWB attached: id={} role={}".format(uwb_id, initial_role))
-            except Exception as e:
-                print("UWB init failed:", e)
-
         # attach BLE logger, tee all prints over it, and handle incoming commands
         if cfg.get("use_bluetooth"):
             try:
@@ -168,7 +147,7 @@ def main():
             except Exception as e:
                 print("BT logger init failed:", e)
 
-        # attach localisation app if enabled
+        # attach localisation app if enabled, then wire UWB into it
         if cfg.get("localisation_enabled"):
             try:
                 from app_localise import LocaliseApp
@@ -176,6 +155,32 @@ def main():
                 print("Localisation app attached")
             except Exception as e:
                 print("Localisation app init failed:", e)
+
+        # attach UWB module into localise_app (requires localise_app to exist)
+        if cfg.get("use_uwb"):
+            loc = getattr(node, "localise_app", None)
+            if loc is None:
+                print("UWB init skipped: localisation_enabled must be true to use UWB")
+            else:
+                try:
+                    from Drivers.uwb.bu03 import BU03
+                    p = cfg.get("uwb_pins", {})
+                    _uwb = BU03(
+                        data_uart_id   = p.get("data_uart_id",   1),
+                        data_tx        = p.get("data_tx",        17),
+                        data_rx        = p.get("data_rx",        18),
+                        config_uart_id = p.get("config_uart_id", 2),
+                        config_tx      = p.get("config_tx",      2),
+                        config_rx      = p.get("config_rx",      1),
+                        reset_pin      = p.get("reset_pin",      15),
+                    )
+                    initial_role = 0 if (uwb_id or 0) == 0 else 1
+                    _uwb.configure_warm(uwb_id or 0, initial_role)
+                    loc.uwb = _uwb
+                    loc.uwb_default_id = uwb_id or 0
+                    print("UWB attached: id={} role={}".format(uwb_id, initial_role))
+                except Exception as e:
+                    print("UWB init failed:", e)
 
         # production: no periodic hardware test in main.py (use Debug/hw_runner.py)
 
