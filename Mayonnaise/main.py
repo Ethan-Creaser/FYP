@@ -227,23 +227,26 @@ def main():
 
         # production: no periodic hardware test in main.py (use Debug/hw_runner.py)
 
-    radio_ok = getattr(node, "radio", None) is not None
-    bg_ok    = getattr(getattr(node, "radio", None), "_bg_running", False)
-    bt_ok    = getattr(node, "bt_logger", None) is not None
-    oled_ok  = getattr(node, "display", None) is not None
-    _loc     = getattr(node, "localise_app", None)
-    uwb_ok   = _loc is not None and getattr(_loc, "uwb", None) is not None
-    print("=" * 40)
-    print("Mayonnaise mesh  v{}".format(VERSION))
-    print("node={} uwb_id={}".format(node_id, uwb_id))
-    print("radio={}  bg={}  bt={}  oled={}  uwb={}".format(
-        "OK"   if radio_ok else "FAIL",
-        "OK"   if bg_ok    else "OFF",
-        "OK"   if bt_ok    else "OFF",
-        "OK"   if oled_ok  else "OFF",
-        "OK"   if uwb_ok   else ("OFF" if not cfg.get("use_uwb") else "FAIL"),
-    ))
-    print("=" * 40)
+    _loc    = getattr(node, "localise_app", None)
+    _radio  = getattr(node, "radio", None)
+    _hw = [
+        ("radio", _radio is not None,                              cfg.get("use_hardware")),
+        ("bt",    getattr(node, "bt_logger", None) is not None,   cfg.get("use_bluetooth")),
+        ("oled",  getattr(node, "display",   None) is not None,   cfg.get("use_hardware")),
+        ("uwb",   _loc is not None and getattr(_loc, "uwb", None) is not None, cfg.get("use_uwb")),
+    ]
+    print("=" * 32)
+    print("  Mayonnaise v{}  node {}".format(VERSION, node_id))
+    print("  " + "-" * 28)
+    for name, ok, wanted in _hw:
+        if not wanted:
+            status = "off"
+        elif ok:
+            status = "OK"
+        else:
+            status = "FAIL"
+        print("  {:<8} {}".format(name, status))
+    print("=" * 32)
 
     beacon_interval = getattr(constants, "BEACON_INTERVAL", 30)
     beacon_jitter   = getattr(constants, "BEACON_JITTER", 5)
