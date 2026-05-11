@@ -13,7 +13,7 @@
   "telemetry_enabled": true,
   "localisation_enabled": true,
 
-  "allowed_neighbors": [5,6,7],
+  "allowed_neighbors": [6,7,8],
 
   "lbt": {
     "enabled": true,

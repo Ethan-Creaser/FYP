@@ -16,8 +16,8 @@ Node ID assignments:
 """
 
 # ── Edit these before running ─────────────────────────────────────────────────
-NODE_ID = 2
-UWB_ID  = 2
+NODE_ID = 6
+UWB_ID  = 6
 # ─────────────────────────────────────────────────────────────────────────────
 
 from identity import write_identity, read_identity
