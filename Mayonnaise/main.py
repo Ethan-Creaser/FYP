@@ -65,7 +65,7 @@ def _attach_uwb(loc, cfg, uwb_id, attempts=3, retry_delay_ms=2000):
             continue
 
         try:
-            _uwb.configure_warm(uwb_id or 0, initial_role)
+            _uwb.configure(uwb_id or 0, initial_role)
         except Exception as e:
             print("UWB configure failed (attempt {}): {}".format(attempt, e))
             if attempt < attempts:
