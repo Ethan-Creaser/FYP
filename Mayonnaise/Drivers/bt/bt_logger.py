@@ -6,6 +6,7 @@ from micropython import const
 # BLE IRQ event codes
 _IRQ_CENTRAL_CONNECT    = const(1)
 _IRQ_CENTRAL_DISCONNECT = const(2)
+_IRQ_GATTS_WRITE        = const(3)
 
 # GATT characteristic flags
 _FLAG_NOTIFY = const(0x0010)
@@ -21,26 +22,23 @@ _NUS_SERVICE = (_NUS_SVC_UUID, (
     (_NUS_RX_UUID, _FLAG_WRITE),
 ))
 
-# BLE can only carry 20 bytes per notify by default; most centrals
-# negotiate higher MTU but 20 is the safe floor.
 _CHUNK = 20
 
 
 class BtLogger:
-    """
-    Advertises the egg as a BLE UART device and streams log lines to any
-    connected central (e.g. bt_monitor.py on the PC).
+    """BLE UART logger using Nordic UART Service.
 
-    Uses the Nordic UART Service so any NUS-compatible app can also connect.
-
-    Call log(line) to send a line to the connected central.
-    poll() is a no-op kept for API symmetry with WiFiLogger — BLE events
-    are driven by the ubluetooth IRQ.
+    Streams all print() output to a connected central (e.g. send_uwb_config.py).
+    Set on_rx to a callable(bytes) to handle writes from the central.
+    poll() must be called regularly from the main loop to process received data
+    safely outside the BLE IRQ context.
     """
 
     def __init__(self, name="egg"):
         self._name = name
         self._conn = None
+        self.on_rx = None        # callable(bytes) — set by main.py
+        self._rx_pending = None  # data buffered from IRQ, processed in poll()
 
         gc.collect()
         utime.sleep_ms(200)
@@ -48,14 +46,13 @@ class BtLogger:
         self._ble.active(True)
         self._ble.irq(self._irq)
 
-        ((self._tx, _rx),) = self._ble.gatts_register_services((_NUS_SERVICE,))
+        ((self._tx, self._rx),) = self._ble.gatts_register_services((_NUS_SERVICE,))
         self._advertise()
 
     def _irq(self, event, data):
         if event == _IRQ_CENTRAL_CONNECT:
             conn_handle, _, _ = data
             self._conn = conn_handle
-            # Stop advertising while a central is connected
             self._ble.gap_advertise(None)
             print("BT: central connected")
             self.log("--- egg connected ---")
@@ -65,13 +62,19 @@ class BtLogger:
             print("BT: central disconnected, re-advertising")
             self._advertise()
 
+        elif event == _IRQ_GATTS_WRITE:
+            _, value_handle = data
+            if value_handle == self._rx:
+                # Buffer only — do NOT call on_rx here. Calling gatts_notify
+                # (via the print tee) from inside a BLE IRQ deadlocks the stack.
+                self._rx_pending = bytes(self._ble.gatts_read(self._rx))
+
     def _advertise(self):
         name_b = self._name.encode()
-        # AD structure: Flags + Complete Local Name
         payload = bytearray()
-        payload += bytes([2, 0x01, 0x06])                        # Flags: LE General Discoverable
-        payload += bytes([1 + len(name_b), 0x09]) + name_b      # Complete Local Name
-        self._ble.gap_advertise(100_000, adv_data=bytes(payload))  # 100 ms interval
+        payload += bytes([2, 0x01, 0x06])
+        payload += bytes([1 + len(name_b), 0x09]) + name_b
+        self._ble.gap_advertise(100_000, adv_data=bytes(payload))
 
     def log(self, line):
         if self._conn is None:
@@ -80,11 +83,17 @@ class BtLogger:
         for i in range(0, len(data), _CHUNK):
             try:
                 self._ble.gatts_notify(self._conn, self._tx, data[i:i + _CHUNK])
-                # Small gap so the BLE stack doesn't drop notifications
                 utime.sleep_ms(5)
             except Exception:
                 self._conn = None
                 break
 
     def poll(self):
-        pass  # BLE events are IRQ-driven; kept for API symmetry
+        """Call from the main loop to safely process buffered RX data."""
+        if self._rx_pending is not None and self.on_rx:
+            data = self._rx_pending
+            self._rx_pending = None
+            try:
+                self.on_rx(data)
+            except Exception as e:
+                print("BT: on_rx error:", e)

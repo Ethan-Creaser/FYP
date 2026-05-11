@@ -13,6 +13,7 @@ from neighbour_table import NeighbourTable
 from route_table import RouteTable
 
 _MAX_PENDING_PER_DST = 3   # max DATA packets buffered per destination while waiting for a route
+_UWB_SCAN_FRAMES     = 20
 
 
 class Node:
@@ -25,6 +26,7 @@ class Node:
         self.display       = None     # set by main if OLED is present
         self.bt_logger     = None     # set by main if BT is enabled
         self.localise_app  = None     # set by LocaliseApp.__init__
+        self.uwb           = None     # set by main.py if use_uwb
         self.start_time    = time.time()
 
         self._seq       = 1
@@ -45,6 +47,9 @@ class Node:
 
         # In-flight RREQ: target_id -> origin_seq we used for that RREQ
         self._rreq_pending = {}
+
+        # Deferred UWB job: set by _handle_app, executed by tick() in the main loop
+        self._uwb_pending = None   # (uwb_id, role, src) or None
 
     # ── Sequence numbers ──────────────────────────────────────────────────────
 
@@ -102,6 +107,14 @@ class Node:
         self.outstanding[(self.node_id, seq)] = [time.time(), pkt, dst, 1]
 
         next_hop = self.routes.get_next_hop(dst)
+
+        # If the route table has no entry, check whether dst is a live direct neighbour.
+        if next_hop is None:
+            nb = self.neighbours.get(dst)
+            if nb and nb.is_alive:
+                next_hop = dst
+                self.routes.set_route(dst, dst, 1)
+
         print("[{}] SEND dst={} seq={} next_hop={}".format(self.node_id, dst, seq, next_hop))
 
         if next_hop is not None:
@@ -144,8 +157,10 @@ class Node:
         if not self.neighbours.is_allowed(from_id):
             return
 
-        # Every received packet refreshes the sender's neighbour entry.
+        # Every received packet refreshes the sender's neighbour entry and
+        # installs a direct 1-hop route — proof of reachability without RREQ/RREP.
         self.neighbours.update(from_id, rssi=rssi, snr=snr)
+        self.routes.set_route(from_id, from_id, 1)
 
         # Update OLED/display if attached
         disp = getattr(self, "display", None)
@@ -210,6 +225,9 @@ class Node:
     def _handle_beacon(self, pkt):
         h = int(pkt.payload[0]) if pkt.payload else 255
         self.neighbours.update(pkt.src, hops_to_ground=(None if h == 255 else h))
+        # Every beacon proves a direct 1-hop link — cache it so we never need
+        # RREQ/RREP to reach a direct neighbour.
+        self.routes.set_route(pkt.src, pkt.src, 1)
         print("[{}] BEACON from={} hops_to_ground={}".format(self.node_id, pkt.src, h))
 
     def _compute_hops_to_ground(self):
@@ -283,13 +301,58 @@ class Node:
                     print("[{}] localise on_rx error: {}".format(self.node_id, e))
             return
 
-        bt = getattr(self, "bt_logger", None)
-        if bt:
-            try:
-                bt.log("RX src={} app={} sub={} seq={}".format(
-                    pkt.src, app_id, subtype, pkt.seq))
-            except Exception:
-                pass
+        if app_id == constants.APP_CTRL:
+            self._handle_app(subtype, body, src=pkt.src)
+            return
+
+    def _handle_app(self, subtype, body, src=None):
+        if subtype == constants.CTRL_UWB_CONFIG and len(body) >= 2:
+            uwb_id = body[0]
+            role   = body[1]
+            print("[{}] UWB config: uwb_id={} role={}".format(self.node_id, uwb_id, role))
+            if self.uwb is not None:
+                self._uwb_pending = (uwb_id, role, src)
+            else:
+                print("[{}] UWB not attached".format(self.node_id))
+
+        elif subtype == constants.CTRL_UWB_RESTORE:
+            print("[{}] UWB restore command received".format(self.node_id))
+            if self.uwb is not None:
+                self._uwb_pending = (None, 1, src)
+            else:
+                print("[{}] UWB not attached".format(self.node_id))
+
+        elif subtype == constants.CTRL_UWB_SCAN_RESULT and len(body) >= 2:
+            uwb_id = body[0]
+            role   = body[1]
+            i = 2
+            while i + 2 < len(body):
+                slot    = body[i]
+                dist_mm = (body[i + 1] << 8) | body[i + 2]
+                print("UWB_RESULT node={} uwb_id={} role={} slot={} dist={:.4f}".format(
+                    src if src is not None else "?", uwb_id, role, slot, dist_mm / 1000.0))
+                i += 3
+
+    def _scan_and_send_uwb(self, uwb_id, role, requester_id):
+        print("[{}] UWB scan ({} frames)...".format(self.node_id, _UWB_SCAN_FRAMES))
+        self.uwb.flush()
+        raw = self.uwb.scan(frames=_UWB_SCAN_FRAMES)
+
+        if not raw:
+            print("[{}] UWB scan: no data".format(self.node_id))
+            return
+
+        payload = bytearray([uwb_id, role])
+        for slot, dist in sorted(raw.items()):
+            print("[{}]   slot {} -> {:.4f} m".format(self.node_id, slot, dist))
+            dist_mm = min(int(dist * 1000), 0xFFFF)
+            payload.append(slot & 0xFF)
+            payload.append((dist_mm >> 8) & 0xFF)
+            payload.append(dist_mm & 0xFF)
+
+        dst = requester_id if requester_id is not None else constants.GROUND_STATION_ID
+        self.send_data(dst, constants.APP_CTRL, constants.CTRL_UWB_SCAN_RESULT, bytes(payload))
+        print("[{}] UWB scan sent to node {}".format(self.node_id, dst))
 
     # ── BCAST ─────────────────────────────────────────────────────────────────
 
@@ -419,7 +482,30 @@ class Node:
 
     def tick(self):
         """Call periodically (e.g. every 5 s) to age neighbours, retry packets,
-        and retransmit stale RREQs."""
+        retransmit stale RREQs, and execute deferred UWB work."""
+        if self._uwb_pending is not None:
+            uwb_id, role, src = self._uwb_pending
+            self._uwb_pending = None
+            if uwb_id is None:
+                default_id = getattr(self, "uwb_default_id", None)
+                if default_id is not None:
+                    print("[{}] UWB restoring to uwb_id={} role=1 (anchor)".format(
+                        self.node_id, default_id))
+                    try:
+                        self.uwb.configure_warm(default_id, 1)
+                        print("[{}] UWB restored ok".format(self.node_id))
+                    except Exception as e:
+                        print("[{}] UWB restore failed: {}".format(self.node_id, e))
+                else:
+                    print("[{}] UWB restore: no default id stored".format(self.node_id))
+            else:
+                try:
+                    self.uwb.configure_warm(uwb_id, role)
+                    print("[{}] UWB reconfigured ok".format(self.node_id))
+                    self._scan_and_send_uwb(uwb_id, role, src)
+                except Exception as e:
+                    print("[{}] UWB reconfigure failed: {}".format(self.node_id, e))
+
         self._age_neighbours()
         self._check_outstanding()
         self._check_rreq_timeouts()
