@@ -25,6 +25,67 @@ except Exception:
     VERSION = "unknown"
 
 
+def _attach_uwb(loc, cfg, uwb_id, attempts=3, retry_delay_ms=2000):
+    """Initialise the BU03 UWB module and attach it to the localise_app.
+
+    Retries up to `attempts` times.  Each attempt:
+      1. Constructs the BU03 (sets up UARTs, 500 ms settle)
+      2. Calls configure_warm() (~5.5 s: three AT commands + warm reset)
+    On success sets loc.uwb and loc.uwb_default_id.
+    """
+    try:
+        from Drivers.uwb.bu03 import BU03
+    except Exception as e:
+        print("UWB driver import failed:", e)
+        return
+
+    p            = cfg.get("uwb_pins", {})
+    initial_role = 0 if (uwb_id or 0) == 0 else 1
+
+    for attempt in range(1, attempts + 1):
+        print("UWB init attempt {}/{}...".format(attempt, attempts))
+        try:
+            _uwb = BU03(
+                data_uart_id   = p.get("data_uart_id",   1),
+                data_tx        = p.get("data_tx",        17),
+                data_rx        = p.get("data_rx",        18),
+                config_uart_id = p.get("config_uart_id", 2),
+                config_tx      = p.get("config_tx",      2),
+                config_rx      = p.get("config_rx",      1),
+                reset_pin      = p.get("reset_pin",      15),
+            )
+        except Exception as e:
+            print("UWB UART init failed (attempt {}): {}".format(attempt, e))
+            if attempt < attempts:
+                try:
+                    import utime
+                    utime.sleep_ms(retry_delay_ms)
+                except Exception:
+                    pass
+            continue
+
+        try:
+            _uwb.configure_warm(uwb_id or 0, initial_role)
+        except Exception as e:
+            print("UWB configure failed (attempt {}): {}".format(attempt, e))
+            if attempt < attempts:
+                try:
+                    import utime
+                    utime.sleep_ms(retry_delay_ms)
+                except Exception:
+                    pass
+            continue
+
+        # Both steps succeeded
+        loc.uwb = _uwb
+        loc.uwb_default_id = uwb_id or 0
+        print("UWB attached: id={} role={} (attempt {})".format(
+            uwb_id, initial_role, attempt))
+        return
+
+    print("UWB init FAILED after {} attempts — UWB not available".format(attempts))
+
+
 def main():
     cfg_path = "config.json"
     try:
@@ -162,25 +223,7 @@ def main():
             if loc is None:
                 print("UWB init skipped: localisation_enabled must be true to use UWB")
             else:
-                try:
-                    from Drivers.uwb.bu03 import BU03
-                    p = cfg.get("uwb_pins", {})
-                    _uwb = BU03(
-                        data_uart_id   = p.get("data_uart_id",   1),
-                        data_tx        = p.get("data_tx",        17),
-                        data_rx        = p.get("data_rx",        18),
-                        config_uart_id = p.get("config_uart_id", 2),
-                        config_tx      = p.get("config_tx",      2),
-                        config_rx      = p.get("config_rx",      1),
-                        reset_pin      = p.get("reset_pin",      15),
-                    )
-                    initial_role = 0 if (uwb_id or 0) == 0 else 1
-                    _uwb.configure_warm(uwb_id or 0, initial_role)
-                    loc.uwb = _uwb
-                    loc.uwb_default_id = uwb_id or 0
-                    print("UWB attached: id={} role={}".format(uwb_id, initial_role))
-                except Exception as e:
-                    print("UWB init failed:", e)
+                _attach_uwb(loc, cfg, uwb_id)
 
         # production: no periodic hardware test in main.py (use Debug/hw_runner.py)
 
@@ -188,14 +231,17 @@ def main():
     bg_ok    = getattr(getattr(node, "radio", None), "_bg_running", False)
     bt_ok    = getattr(node, "bt_logger", None) is not None
     oled_ok  = getattr(node, "display", None) is not None
+    _loc     = getattr(node, "localise_app", None)
+    uwb_ok   = _loc is not None and getattr(_loc, "uwb", None) is not None
     print("=" * 40)
     print("Mayonnaise mesh  v{}".format(VERSION))
-    print("node={} uwb={}".format(node_id, uwb_id))
-    print("radio={}  bg={}  bt={}  oled={}".format(
-        "OK" if radio_ok else "FAIL",
-        "OK" if bg_ok    else "OFF",
-        "OK" if bt_ok    else "OFF",
-        "OK" if oled_ok  else "OFF",
+    print("node={} uwb_id={}".format(node_id, uwb_id))
+    print("radio={}  bg={}  bt={}  oled={}  uwb={}".format(
+        "OK"   if radio_ok else "FAIL",
+        "OK"   if bg_ok    else "OFF",
+        "OK"   if bt_ok    else "OFF",
+        "OK"   if oled_ok  else "OFF",
+        "OK"   if uwb_ok   else ("OFF" if not cfg.get("use_uwb") else "FAIL"),
     ))
     print("=" * 40)
 
