@@ -4,6 +4,7 @@
 
   "use_hardware": true,
   "use_bluetooth": true,
+  "use_uwb": true,
   "hw_test_enabled": true,
   "hw_test_target": 3,
   "hw_test_interval_s": 15,
@@ -12,7 +13,7 @@
   "telemetry_enabled": true,
   "localisation_enabled": true,
 
-  "allowed_neighbors": [2],
+  "allowed_neighbors": [5,6,7],
 
   "lbt": {
     "enabled": true,
