@@ -103,8 +103,12 @@ def main():
         node_id = int(cfg.get("node_id", 1))
         uwb_id = None
 
-    allowed = cfg.get("allowed_neighbors")
-    allowlist = set(allowed) if allowed else None
+    try:
+        from identity import get_allowed_neighbors
+        allowlist = get_allowed_neighbors(cfg_path=cfg_path)
+    except Exception:
+        allowed = cfg.get("allowed_neighbors")
+        allowlist = set(allowed) if allowed else None
 
     node = Node(node_id, allowlist=allowlist)
 

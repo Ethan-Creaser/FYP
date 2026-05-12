@@ -37,8 +37,9 @@ CMD_UWB_RESTORE = 0xD0   # [CMD_UWB_RESTORE, target_id]
 
 SCAN_TIMEOUT  = 10.0
 # Time to wait after sending the restore command before moving to the next egg.
-# The egg runs configure_warm (~5.5 s) on receipt; add headroom for LoRa round trip.
-RESTORE_WAIT  = 8.0
+# Multi-hop: LoRa routing to the egg (up to ~6 s with retries) + configure_warm (~5.5 s)
+# = at least 12 s for 2 hops. 15 s gives comfortable headroom.
+RESTORE_WAIT  = 15.0
 
 _CSV_PATH   = "uwb_scan.csv"
 _CSV_HEADER = ["pc_timestamp_ms", "node_id", "uwb_id", "role", "slot", "distance_m"]

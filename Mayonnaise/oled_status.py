@@ -104,6 +104,6 @@ class OLEDStatus:
             except Exception:
                 print("OLED redraw failed;", lines)
         else:
-            print("OLED:")
+            #print("OLED:")
             for l in lines:
-                print("  ", l)
+                #print("  ", l)
