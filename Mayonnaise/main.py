@@ -105,10 +105,9 @@ def main():
 
     try:
         from identity import get_allowed_neighbors
-        allowlist = get_allowed_neighbors(cfg_path=cfg_path)
+        allowlist = get_allowed_neighbors()
     except Exception:
-        allowed = cfg.get("allowed_neighbors")
-        allowlist = set(allowed) if allowed else None
+        allowlist = None
 
     node = Node(node_id, allowlist=allowlist)
 
@@ -167,10 +166,12 @@ def main():
                 builtins.print = _tee_print
 
                 # BLE command bytes from the PC
-                # 0xCF [target_id, uwb_id, role]  → UWB config (reconfigure + scan)
-                # 0xD0 [target_id]                → UWB restore to identity.bin default
-                _BT_CMD_UWB         = 0xCF
-                _BT_CMD_UWB_RESTORE = 0xD0
+                # 0xCF [target_id, uwb_id, role]              → UWB config (reconfigure + scan)
+                # 0xD0 [target_id]                            → UWB restore to identity.bin default
+                # 0xD1 [target_id, uwb_id, count, n0, n1...]  → rewrite identity.bin + live allowlist
+                _BT_CMD_UWB          = 0xCF
+                _BT_CMD_UWB_RESTORE  = 0xD0
+                _BT_CMD_IDENTITY     = 0xD1
                 def _bt_rx(data):
                     if not data:
                         return

@@ -33,7 +33,7 @@ class Node:
         # Duplicate suppression: (src, seq) -> timestamp of first receipt
         self._seen = {}
 
-        # Hop-by-hop ACK relay table: (orig_src, orig_seq) -> prev_hop node_id
+        # Hop-by-hop ACK relay table: (orig_src, orig_seq) -> [prev_hop, timestamp]
         # Entries are for packets we forwarded (not originated).
         self.pending_forwards = {}
 
@@ -102,7 +102,8 @@ class Node:
         self.outstanding[(self.node_id, seq)] = [time.time(), pkt, dst, 1]
 
         next_hop = self.routes.get_next_hop(dst)
-        print("[{}] SEND dst={} seq={} next_hop={}".format(self.node_id, dst, seq, next_hop))
+        print("[{}] SEND dst={} seq={} app={} sub={} next_hop={}".format(
+            self.node_id, dst, seq, app_id, subtype, next_hop))
 
         if next_hop is not None:
             self.send_packet(pkt)
@@ -142,6 +143,7 @@ class Node:
 
         # Enforce topology allowlist — drop packets from senders outside it.
         if not self.neighbours.is_allowed(from_id):
+            print("[{}] DROP sender={} not in allowlist".format(self.node_id, from_id))
             return
 
         # Every received packet refreshes the sender's neighbour entry.
@@ -160,9 +162,18 @@ class Node:
     def _seen_check(self, pkt):
         """Return True if (src, seq) was seen recently (duplicate). Record if new."""
         key = (pkt.src, pkt.seq)
+        now = time.time()
         if key in self._seen:
-            return True
-        self._seen[key] = time.time()
+            age = now - self._seen[key]
+            if age < constants.SEEN_TTL:
+                print("[{}] DROP dup src={} seq={} age={:.1f}s".format(
+                    self.node_id, pkt.src, pkt.seq, age))
+                return True
+            # Entry expired — treat as unseen (handles seq reuse after remote reboot)
+            print("[{}] SEEN expired src={} seq={} age={:.1f}s — accepting".format(
+                self.node_id, pkt.src, pkt.seq, age))
+            del self._seen[key]
+        self._seen[key] = now
         # Prune oldest half when cache gets large (MicroPython-safe: no heapq)
         if len(self._seen) > 256:
             items = sorted(self._seen.items(), key=lambda x: x[1])
@@ -188,13 +199,17 @@ class Node:
 
         if pkt.kind == constants.KIND_DATA:
             if self._seen_check(pkt):
-                # Duplicate — re-ACK if we are the destination so sender can clear retry
                 if pkt.dst == self.node_id:
+                    # Re-ACK so sender can clear its retry
                     ack = packets.make_ack(
                         src=self.node_id, dst=from_id,
                         orig_src=pkt.src, orig_seq=pkt.seq
                     )
                     self.send_packet(ack)
+                elif (pkt.src, pkt.seq) in self.pending_forwards:
+                    # We relayed this but the next hop hasn't ACKed yet — re-forward
+                    # so the next hop gets another chance if it missed the first TX.
+                    self._handle_data(pkt, from_id)
                 return
             self._handle_data(pkt, from_id)
             return
@@ -249,11 +264,17 @@ class Node:
 
         # Not for me — forward
         if pkt.ttl <= 1:
+            print("[{}] DROP src={} seq={} ttl expired".format(
+                self.node_id, pkt.src, pkt.seq))
+            return
+        if not self.neighbours.is_allowed(pkt.dst):
+            print("[{}] DROP src={} seq={} dst={} not in allowlist".format(
+                self.node_id, pkt.src, pkt.seq, pkt.dst))
             return
         pkt.ttl -= 1
 
         # Record prev_hop so we can relay the ACK back when it arrives
-        self.pending_forwards[(pkt.src, pkt.seq)] = from_id
+        self.pending_forwards[(pkt.src, pkt.seq)] = [from_id, time.time()]
 
         # If a RREP is passing through, opportunistically cache the forward route
         if len(pkt.payload) >= 6:
@@ -266,8 +287,12 @@ class Node:
             except Exception:
                 pass
 
-        print("[{}] FWD DATA src={} dst={} seq={} ttl={}".format(
-            self.node_id, pkt.src, pkt.dst, pkt.seq, pkt.ttl))
+        try:
+            fwd_app, fwd_sub = pkt.payload[0], pkt.payload[1]
+        except Exception:
+            fwd_app, fwd_sub = "?", "?"
+        print("[{}] FWD DATA src={} dst={} seq={} app={} sub={} ttl={}".format(
+            self.node_id, pkt.src, pkt.dst, pkt.seq, fwd_app, fwd_sub, pkt.ttl))
         self.send_packet(pkt)
 
     def _deliver_to_app(self, pkt, app_id, subtype, body):
@@ -324,9 +349,8 @@ class Node:
             origin_id  = pkt.src
             origin_seq = pkt.seq
 
-            # Cache the reverse path to the origin so RREP can travel back
-            if from_id != origin_id:
-                self.routes.set_route(origin_id, from_id, hop_count + 1)
+            # Cache the reverse path to the origin (works for both direct and relayed RREQs)
+            self.routes.set_route(origin_id, from_id, hop_count + 1)
 
             print("[{}] RREQ origin={} target={} hops={}".format(
                 self.node_id, origin_id, target_id, hop_count))
@@ -356,7 +380,6 @@ class Node:
             hop_count=hop_count,
         )
         print("[{}] RREP -> origin={} hops={}".format(self.node_id, origin_id, hop_count))
-        self.outstanding[(self.node_id, seq)] = [time.time(), pkt, origin_id, 1]
         self.send_packet(pkt)
 
     def _handle_routing_data(self, subtype, body, from_id):
@@ -402,9 +425,10 @@ class Node:
                     pass
             return
 
-        prev = self.pending_forwards.pop(key, None)
-        if prev is None:
+        entry = self.pending_forwards.pop(key, None)
+        if entry is None:
             return
+        prev = entry[0]
         # Relay ACK one hop further back toward the originator
         print("[{}] relay ACK orig_src={} seq={} -> prev={}".format(
             self.node_id, orig_src, orig_seq, prev))
@@ -419,6 +443,8 @@ class Node:
     def tick(self):
         """Call periodically (e.g. every 5 s) to age neighbours, retry packets,
         and retransmit stale RREQs."""
+        now = time.time()
+
         loc = getattr(self, "localise_app", None)
         if loc and hasattr(loc, "tick"):
             try:
@@ -426,9 +452,18 @@ class Node:
             except Exception as e:
                 print("[{}] localise tick error: {}".format(self.node_id, e))
 
+        # Fix: if loc.tick() blocked for longer than HOP_ACK_TIMEOUT (e.g. UWB scan),
+        # bump outstanding sent_times forward to prevent a retry burst firing immediately.
+        after = time.time()
+        gap = after - now
+        if gap > constants.HOP_ACK_TIMEOUT:
+            for entry in self.outstanding.values():
+                entry[0] += gap
+
         self._age_neighbours()
         self._check_outstanding()
         self._check_rreq_timeouts()
+        self._expire_pending_forwards()
 
     def _age_neighbours(self):
         for node_id in self.neighbours.get_newly_lost():
@@ -452,12 +487,20 @@ class Node:
             if attempts < constants.MAX_HOP_RETRIES:
                 entry[0] = now
                 entry[3] += 1
-                print("[{}] retry seq={} dst={} attempt={}".format(
-                    self.node_id, key[1], dst, entry[3]))
+                try:
+                    retry_app, retry_sub = pkt.payload[1], pkt.payload[2]
+                except Exception:
+                    retry_app, retry_sub = "?", "?"
+                print("[{}] retry seq={} dst={} app={} sub={} attempt={}".format(
+                    self.node_id, key[1], dst, retry_app, retry_sub, entry[3]))
                 self.send_packet(pkt)
             else:
-                print("[{}] give up seq={} dst={} — penalising route".format(
-                    self.node_id, key[1], dst))
+                try:
+                    give_app, give_sub = pkt.payload[1], pkt.payload[2]
+                except Exception:
+                    give_app, give_sub = "?", "?"
+                print("[{}] give up seq={} dst={} app={} sub={} — penalising route".format(
+                    self.node_id, key[1], dst, give_app, give_sub))
                 self.routes.penalize(dst)
                 del self.outstanding[key]
                 self._flood_rreq(dst)
@@ -481,8 +524,23 @@ class Node:
             else:
                 print("[{}] RREQ failed target={} — dropping buffered data".format(
                     self.node_id, target_id))
+                dropped = self._pending_data.pop(target_id, [])
                 del self._rreq_pending[target_id]
-                self._pending_data.pop(target_id, None)
+                # Remove from outstanding so _check_outstanding doesn't retry dropped packets
+                for pkt in dropped:
+                    self.outstanding.pop((self.node_id, pkt.seq), None)
+                loc = getattr(self, "localise_app", None)
+                if loc is not None and dropped:
+                    cb = getattr(loc, "on_route_fail", None)
+                    if cb:
+                        cb(target_id, dropped)
+
+    def _expire_pending_forwards(self):
+        """Drop pending_forward entries that are older than the max retry window."""
+        cutoff = time.time() - (constants.HOP_ACK_TIMEOUT * constants.MAX_HOP_RETRIES * 2)
+        for key in list(self.pending_forwards.keys()):
+            if self.pending_forwards[key][1] < cutoff:
+                del self.pending_forwards[key]
 
     # ── Hardware attach ───────────────────────────────────────────────────────
 

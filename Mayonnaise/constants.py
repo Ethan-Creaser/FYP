@@ -13,6 +13,7 @@ HOP_ACK_TIMEOUT      = 5         # seconds before retrying an unACKed hop
 MAX_HOP_RETRIES      = 3
 RREQ_TIMEOUT         = 3         # seconds to wait for RREP before retrying
 RREQ_MAX_ATTEMPTS    = 2         # max RREQ floods before giving up on a destination
+SEEN_TTL             = 120       # seconds before a _seen entry expires (handles seq reuse after reboot)
 
 # IDs
 GROUND_STATION_ID = 99
@@ -56,3 +57,4 @@ ROUTING_RECOVERY = 3
 CTRL_UWB_CONFIG      = 1   # payload: [uwb_id, role]
 CTRL_UWB_SCAN_RESULT = 2   # payload: [uwb_id, role, slot, dist_mm_hi, dist_mm_lo, ...]
 CTRL_UWB_RESTORE     = 3   # payload: [] — egg reverts to its identity.bin uwb_id, role=1
+CTRL_IDENTITY_WRITE  = 4   # payload: [uwb_id, count, n0, n1, ...] — rewrite identity.bin + live allowlist

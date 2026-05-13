@@ -7,6 +7,8 @@ solver (Trilat/code git/localise.py  →  solve_from_distance_matrix).
 Usage:
     python map_from_csv.py
     python map_from_csv.py --csv uwb_scan.csv --out map.png
+    python map_from_csv.py --uwb-map 5:8          # UWB slot 5 → egg 8
+    python map_from_csv.py --uwb-map 5:8 3:6      # multiple remaps
 
 Requires:
     pip install matplotlib
@@ -47,16 +49,19 @@ NODE_COLOURS = [
 
 # ── CSV loading ───────────────────────────────────────────────────────────────
 
-def load_csv(path):
+def load_csv(path, uwb_map=None):
     """
     Returns:
         measurements : list of (node_id_a, node_id_b, distance_m)
 
-    Each row: node_id = tag node, slot = anchor's uwb_id = anchor's node_id.
-    All scanned rows have uwb_id=0 (temporary tag assignment), so slot is used
-    directly as the anchor node_id.
+    Each row: node_id = tag node, slot = anchor's uwb_id.
+    By default slot == anchor node_id, but uwb_map overrides this for eggs
+    whose UWB ID differs from their node/egg ID (e.g. egg 8 with UWB ID 5).
+
+    uwb_map : {uwb_id: node_id}  e.g. {5: 8}
     """
-    raw_dist = defaultdict(list)   # (node_id_tag, slot) -> [distances]
+    uwb_map = uwb_map or {}
+    raw_dist = defaultdict(list)   # (node_id_tag, anchor_node_id) -> [distances]
 
     with open(path, newline="") as f:
         reader = csv.DictReader(f)
@@ -67,13 +72,12 @@ def load_csv(path):
                 dist    = float(row["distance_m"])
             except (KeyError, ValueError):
                 continue
-            raw_dist[(node_id, slot)].append(dist)
+            anchor_node_id = uwb_map.get(slot, slot)
+            raw_dist[(node_id, anchor_node_id)].append(dist)
 
-    # Median of repeated measurements; slot == anchor node_id
     measurements = []
-    for (node_a, slot_b), dists in raw_dist.items():
-        node_b = slot_b          # slot number IS the anchor's node_id
-        median_dist = sum(dists) / len(dists)   # mean (no numpy needed)
+    for (node_a, node_b), dists in raw_dist.items():
+        median_dist = sum(dists) / len(dists)
         measurements.append((node_a, node_b, median_dist))
 
     return measurements
@@ -177,11 +181,25 @@ def main():
                         help="Path to CSV file (default: uwb_scan.csv)")
     parser.add_argument("--out", default=None,
                         help="Save plot to file instead of displaying (e.g. map.png)")
+    parser.add_argument("--uwb-map", nargs="*", metavar="UWB_ID:NODE_ID", default=[],
+                        help="Map UWB slot IDs to egg/node IDs when they differ. "
+                             "e.g. --uwb-map 5:8  or  --uwb-map 5:8 3:6")
     args = parser.parse_args()
+
+    uwb_map = {}
+    for entry in (args.uwb_map or []):
+        try:
+            uwb_id, node_id = entry.split(":")
+            uwb_map[int(uwb_id)] = int(node_id)
+        except (ValueError, AttributeError):
+            print("WARNING: ignoring invalid --uwb-map entry '{}'".format(entry))
+    if uwb_map:
+        print("UWB ID remapping: {}".format(
+            ", ".join("slot {} → egg {}".format(u, n) for u, n in sorted(uwb_map.items()))))
 
     print("Reading {}...".format(args.csv))
     try:
-        measurements = load_csv(args.csv)
+        measurements = load_csv(args.csv, uwb_map=uwb_map)
     except FileNotFoundError:
         print("ERROR: {} not found.".format(args.csv))
         sys.exit(1)

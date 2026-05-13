@@ -9,7 +9,7 @@ Old 3-byte format (no neighbor_count byte) is read as "no restriction".
 Usage:
   from identity import get_ids, get_allowed_neighbors, write_identity
   node_id, uwb_id = get_ids()
-  allowlist = get_allowed_neighbors()   # set or None
+  allowlist = get_allowed_neighbors()    # set or None (identity.bin only)
   write_identity(3, uwb_id=3, allowed_neighbors=[2, 4])
 """
 
@@ -79,19 +79,9 @@ def get_ids(cfg_path="config.json"):
         return (1, 1)
 
 
-def get_allowed_neighbors(cfg_path="config.json"):
-    """Return allowed_neighbors set.
-
-    Priority: identity.bin neighbors → config.json allowed_neighbors → None (no restriction).
-    """
+def get_allowed_neighbors():
+    """Return allowed_neighbors set from identity.bin, or None if not set."""
     ids = read_identity()
     if ids is not None and ids[2] is not None:
         return ids[2]
-    try:
-        import json
-        with open(cfg_path, "r") as f:
-            cfg = json.load(f)
-        allowed = cfg.get("allowed_neighbors")
-        return set(int(x) for x in allowed) if allowed else None
-    except Exception:
-        return None
+    return None

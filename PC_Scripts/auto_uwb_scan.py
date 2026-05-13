@@ -19,6 +19,7 @@ Requires:
 import argparse
 import asyncio
 import csv
+import datetime
 import os
 import sys
 import time as _time
@@ -41,8 +42,14 @@ SCAN_TIMEOUT  = 10.0
 # = at least 12 s for 2 hops. 15 s gives comfortable headroom.
 RESTORE_WAIT  = 15.0
 
-_CSV_PATH   = "uwb_scan.csv"
+_CSV_DIR    = "localisation_tests"
 _CSV_HEADER = ["pc_timestamp_ms", "node_id", "uwb_id", "role", "slot", "distance_m"]
+
+
+def _make_csv_path():
+    os.makedirs(_CSV_DIR, exist_ok=True)
+    stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return os.path.join(_CSV_DIR, "uwb_scan_{}.csv".format(stamp))
 
 
 def _parse_uwb_result(line):
@@ -59,16 +66,14 @@ def _parse_uwb_result(line):
         return None
 
 
-def _write_csv(rows):
+def _write_csv(rows, path):
     if not rows:
         return
-    write_header = not os.path.exists(_CSV_PATH) or os.path.getsize(_CSV_PATH) == 0
-    with open(_CSV_PATH, "a", newline="") as f:
+    with open(path, "w", newline="") as f:
         w = csv.writer(f)
-        if write_header:
-            w.writerow(_CSV_HEADER)
+        w.writerow(_CSV_HEADER)
         w.writerows(rows)
-    print("Logged {} row(s) to {}".format(len(rows), _CSV_PATH))
+    print("Logged {} row(s) to {}".format(len(rows), path))
 
 
 async def run_scan(via_name, target_ids, per_egg_timeout):
@@ -173,8 +178,8 @@ def main():
                        help="Inclusive range of target egg IDs, e.g. --range 1 10")
     group.add_argument("--targets", nargs="+", type=int, metavar="ID",
                        help="Explicit list of target egg IDs")
-    parser.add_argument("--timeout", type=float, default=30.0,
-                        help="Seconds to wait per egg for scan result (default 30)")
+    parser.add_argument("--timeout", type=float, default=60.0,
+                        help="Seconds to wait per egg for scan result (default 60)")
     args = parser.parse_args()
 
     target_ids = (list(range(args.range[0], args.range[1] + 1))
@@ -194,8 +199,9 @@ def main():
         print("Cancelled.")
         sys.exit(0)
 
+    csv_path = _make_csv_path()
     rows = asyncio.run(run_scan(args.name, target_ids, args.timeout))
-    _write_csv(rows)
+    _write_csv(rows, csv_path)
 
 
 if __name__ == "__main__":

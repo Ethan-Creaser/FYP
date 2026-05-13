@@ -13,8 +13,6 @@
   "telemetry_enabled": true,
   "localisation_enabled": true,
 
-  "allowed_neighbors": [6,7,8],
-
   "lbt": {
     "enabled": true,
     "cad_timeout_ms": 50,

@@ -50,8 +50,9 @@ class LocaliseApp:
         self.node = node
         node.localise_app = self   # registers with node so mesh calls on_rx/on_ctrl/tick
 
-        self.uwb          = None   # set by main.py after construction if use_uwb
-        self._uwb_pending = None   # (uwb_id, role, src) or None — executed by tick()
+        self.uwb           = None   # set by main.py after construction if use_uwb
+        self._uwb_pending  = None   # (uwb_id, role, src) or None — executed by tick()
+        self._last_scan_dst = None  # destination of the most recent scan send
 
     # ── Mesh send helper ──────────────────────────────────────────────────────
 
@@ -79,6 +80,22 @@ class LocaliseApp:
 
         Handles UWB role-assignment commands sent by the PC via the gateway egg.
         """
+        if subtype == constants.CTRL_UWB_SCAN_RESULT:
+            uwb_id = body[0] if len(body) > 0 else 0
+            role   = body[1] if len(body) > 1 else 0
+            n_slots = (len(body) - 2) // 3 if len(body) >= 2 else 0
+            print("[localise] SCAN RESULT from={} uwb_id={} role={} slots={}".format(
+                src_mesh_id, uwb_id, role, n_slots))
+            for i in range(n_slots):
+                off = 2 + i * 3
+                slot    = body[off]
+                dist_mm = (body[off + 1] << 8) | body[off + 2]
+                dist    = dist_mm / 1000.0
+                print("[localise]   slot {} -> {:.4f} m".format(slot, dist))
+                print("UWB_RESULT node={} uwb_id={} role={} slot={} dist={:.4f}".format(
+                    src_mesh_id, uwb_id, role, slot, dist))
+            return
+
         if subtype == constants.CTRL_UWB_CONFIG and len(body) >= 2:
             uwb_id = body[0]
             role   = body[1]
@@ -97,17 +114,6 @@ class LocaliseApp:
                 self._uwb_pending = (None, 1, src_mesh_id)
             else:
                 print("[localise] UWB not attached")
-
-        elif subtype == constants.CTRL_UWB_SCAN_RESULT and len(body) >= 2:
-            uwb_id = body[0]
-            role   = body[1]
-            i = 2
-            while i + 2 < len(body):
-                slot    = body[i]
-                dist_mm = (body[i + 1] << 8) | body[i + 2]
-                print("UWB_RESULT node={} uwb_id={} role={} slot={} dist={:.4f}".format(
-                    src_mesh_id, uwb_id, role, slot, dist_mm / 1000.0))
-                i += 3
 
     # ── Periodic tick (called by node.tick()) ─────────────────────────────────
 
@@ -145,6 +151,11 @@ class LocaliseApp:
             except Exception as e:
                 print("[localise] UWB reconfigure failed:", e)
 
+    def on_route_fail(self, target_id, dropped_pkts):
+        """Called by node when RREQ exhausted and scan result packets are dropped."""
+        print("[localise] WARNING: route to node {} failed — {} scan result packet(s) lost".format(
+            target_id, len(dropped_pkts)))
+
     # ── UWB scan ──────────────────────────────────────────────────────────────
 
     def _scan_and_send_uwb(self, uwb_id, role, requester_id):
@@ -165,6 +176,11 @@ class LocaliseApp:
             payload.append(dist_mm & 0xFF)
 
         dst = requester_id if requester_id is not None else constants.GROUND_STATION_ID
+        self._last_scan_dst = dst
+        next_hop = self.node.routes.get_next_hop(dst)
+        print("[localise] sending scan to node {} via next_hop={} ({} slot readings)".format(
+            dst, next_hop, len(raw)))
         self.node.send_data(dst, constants.APP_CTRL, constants.CTRL_UWB_SCAN_RESULT,
                             bytes(payload))
-        print("[localise] UWB scan sent to node {}".format(dst))
+        print("[localise] UWB scan queued seq={} dst={} next_hop={}".format(
+            self.node._seq - 1, dst, next_hop))

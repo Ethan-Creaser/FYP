@@ -20,9 +20,9 @@ Node ID assignments:
 """
 
 # ── Edit these before running ─────────────────────────────────────────────────
-NODE_ID           = 7
-UWB_ID            = 7
-ALLOWED_NEIGHBORS = [6,8]   # [] or None → fall back to config.json
+NODE_ID           = 6
+UWB_ID            = 6
+ALLOWED_NEIGHBORS = [7,10]   # [] or None → fall back to config.json
 # ─────────────────────────────────────────────────────────────────────────────
 
 from identity import write_identity, read_identity
