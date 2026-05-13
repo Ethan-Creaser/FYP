@@ -1,0 +1,11 @@
+# egg_id:uwb_id
+# Add one entry per line for any egg whose UWB ID differs from its node ID.
+# Example: egg 8 was assigned UWB ID 5
+# 8:5
+
+
+6:6
+7:7
+8:5
+9:1
+10:2

@@ -115,6 +115,24 @@ class LocaliseApp:
             else:
                 print("[localise] UWB not attached")
 
+        elif subtype == constants.CTRL_IDENTITY_WRITE:
+            if len(body) < 2:
+                print("[localise] IDENTITY_WRITE: payload too short")
+                return
+            uwb_id  = body[0]
+            count   = body[1]
+            neighbors = list(body[2:2 + count]) if count > 0 else []
+            node_id = self.node.node_id
+            print("[localise] IDENTITY_WRITE: node_id={} uwb_id={} neighbors={}".format(
+                node_id, uwb_id, neighbors))
+            try:
+                from identity import write_identity
+                write_identity(node_id, uwb_id, allowed_neighbors=neighbors or None)
+                self.node.neighbours.allowlist = set(neighbors) if neighbors else None
+                print("[localise] Identity updated ok")
+            except Exception as e:
+                print("[localise] Identity write failed:", e)
+
     # ── Periodic tick (called by node.tick()) ─────────────────────────────────
 
     def tick(self):

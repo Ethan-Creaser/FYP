@@ -5,10 +5,14 @@ a pairwise distance dict, then solves positions using the project's trilateratio
 solver (Trilat/code git/localise.py  →  solve_from_distance_matrix).
 
 Usage:
-    python map_from_csv.py
-    python map_from_csv.py --csv uwb_scan.csv --out map.png
-    python map_from_csv.py --uwb-map 5:8          # UWB slot 5 → egg 8
-    python map_from_csv.py --uwb-map 5:8 3:6      # multiple remaps
+    python map_from_csv.py --csv localisation_tests/uwb_scan_20260513_143022.csv
+    python map_from_csv.py --csv localisation_tests/uwb_scan_20260513_143022.csv --out map.png
+    python map_from_csv.py --csv ... --uwb-map-file uwb_id_map.txt
+
+uwb_id_map.txt format (one entry per line, # = comment):
+    # egg_id:uwb_id
+    8:5
+    6:3
 
 Requires:
     pip install matplotlib
@@ -16,6 +20,7 @@ Requires:
 
 import argparse
 import csv
+import math
 import os
 import sys
 from collections import defaultdict
@@ -38,7 +43,13 @@ except ImportError:
     print("matplotlib required:  pip install matplotlib")
     sys.exit(1)
 
-_CSV_PATH = "uwb_scan.csv"
+_CSV_DIR  = "localisation_tests"
+
+
+def _latest_csv():
+    import glob
+    files = sorted(glob.glob(os.path.join(_CSV_DIR, "uwb_scan_*.csv")))
+    return files[-1] if files else None
 
 NODE_COLOURS = [
     '#00bfff', '#ff69b4', '#ffd700', '#7fff00',
@@ -172,36 +183,85 @@ def plot_map(coords_dict, measurements, out_path=None):
         plt.show()
 
 
+# ── Orientation ──────────────────────────────────────────────────────────────
+
+def orient_coords(coords_dict, bl_egg, tr_egg):
+    """Rotate all coordinates so bl_egg is bottom-left and tr_egg is top-right."""
+    missing = [e for e in [bl_egg, tr_egg] if e not in coords_dict]
+    if missing:
+        print("WARNING: orientation egg(s) {} not in solution — skipping orientation.".format(missing))
+        return coords_dict
+
+    x_bl, y_bl = coords_dict[bl_egg][0], coords_dict[bl_egg][1]
+    x_tr, y_tr = coords_dict[tr_egg][0], coords_dict[tr_egg][1]
+
+    current_angle = math.atan2(y_tr - y_bl, x_tr - x_bl)
+    target_angle  = math.pi / 4   # 45° = northeast direction
+    phi = target_angle - current_angle
+
+    cos_phi, sin_phi = math.cos(phi), math.sin(phi)
+
+    return {
+        nid: (x * cos_phi - y * sin_phi,
+              x * sin_phi + y * cos_phi,
+              z)
+        for nid, (x, y, z) in coords_dict.items()
+    }
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(
         description="Map egg positions from uwb_scan.csv using project trilateration solver.")
-    parser.add_argument("--csv", default=_CSV_PATH,
-                        help="Path to CSV file (default: uwb_scan.csv)")
+    parser.add_argument("--csv", default=None,
+                        help="Path to CSV file (default: most recent file in localisation_tests/)")
     parser.add_argument("--out", default=None,
                         help="Save plot to file instead of displaying (e.g. map.png)")
-    parser.add_argument("--uwb-map", nargs="*", metavar="UWB_ID:NODE_ID", default=[],
-                        help="Map UWB slot IDs to egg/node IDs when they differ. "
-                             "e.g. --uwb-map 5:8  or  --uwb-map 5:8 3:6")
+    parser.add_argument("--bottom-left", type=int, default=None, metavar="EGG_ID",
+                        help="Egg ID to anchor in the bottom-left for orientation")
+    parser.add_argument("--top-right", type=int, default=None, metavar="EGG_ID",
+                        help="Egg ID to anchor in the top-right for orientation")
+    parser.add_argument("--uwb-map-file", default="uwb_id_map.txt", metavar="FILE",
+                        help="Path to txt file mapping egg IDs to UWB slot IDs. "
+                             "One 'egg_id:uwb_id' entry per line. Lines starting with # are ignored. "
+                             "(default: uwb_id_map.txt)")
     args = parser.parse_args()
 
     uwb_map = {}
-    for entry in (args.uwb_map or []):
+    if args.uwb_map_file and os.path.exists(args.uwb_map_file):
         try:
-            uwb_id, node_id = entry.split(":")
-            uwb_map[int(uwb_id)] = int(node_id)
-        except (ValueError, AttributeError):
-            print("WARNING: ignoring invalid --uwb-map entry '{}'".format(entry))
+            with open(args.uwb_map_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    try:
+                        node_id, uwb_id = line.split(":")
+                        uwb_map[int(uwb_id)] = int(node_id)
+                    except (ValueError, AttributeError):
+                        print("WARNING: ignoring invalid line '{}' in {}".format(line, args.uwb_map_file))
+        except FileNotFoundError:
+            if args.uwb_map_file != "uwb_id_map.txt":
+                print("ERROR: uwb-map-file '{}' not found.".format(args.uwb_map_file))
+                sys.exit(1)
     if uwb_map:
-        print("UWB ID remapping: {}".format(
-            ", ".join("slot {} → egg {}".format(u, n) for u, n in sorted(uwb_map.items()))))
+        print("UWB ID remapping (from {}):".format(args.uwb_map_file))
+        for u, n in sorted(uwb_map.items()):
+            print("  slot {} → egg {}".format(u, n))
 
-    print("Reading {}...".format(args.csv))
+    csv_path = args.csv or _latest_csv()
+    if csv_path is None:
+        print("ERROR: no CSV file found in '{}'.".format(_CSV_DIR))
+        sys.exit(1)
+    if args.csv is None:
+        print("Using most recent scan: {}".format(csv_path))
+
+    print("Reading {}...".format(csv_path))
     try:
-        measurements = load_csv(args.csv, uwb_map=uwb_map)
+        measurements = load_csv(csv_path, uwb_map=uwb_map)
     except FileNotFoundError:
-        print("ERROR: {} not found.".format(args.csv))
+        print("ERROR: {} not found.".format(csv_path))
         sys.exit(1)
 
     if not measurements:
@@ -228,12 +288,20 @@ def main():
         print("Solver returned no positions.")
         sys.exit(1)
 
-    print("\nSolved positions (node_0 at origin, node_0→node_1 = +X):")
+    if args.bottom_left is not None and args.top_right is not None:
+        print("Orienting: egg_{} → bottom-left, egg_{} → top-right...".format(
+            args.bottom_left, args.top_right))
+        coords_dict = orient_coords(coords_dict, args.bottom_left, args.top_right)
+    elif (args.bottom_left is None) != (args.top_right is None):
+        print("WARNING: provide both --bottom-left and --top-right to orient the map.")
+
+    print("\nSolved positions:")
     for nid in sorted(coords_dict):
         x, y, z = coords_dict[nid]
         print("  egg_{}: x={:.3f}m  y={:.3f}m".format(nid, x, y))
 
     plot_map(coords_dict, measurements, out_path=args.out)
+
 
 
 if __name__ == "__main__":

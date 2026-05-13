@@ -205,6 +205,36 @@ def main():
                             b"",
                         )
                         print("UWB restore sent to egg_{}".format(target_id))
+                    elif cmd == _BT_CMD_IDENTITY:
+                        # [0xD1, target_id, uwb_id, neighbor_count, n0, n1, ...]
+                        if len(data) < 4:
+                            print("BT: identity write too short:", list(data))
+                            return
+                        target_id  = data[1]
+                        uwb_id_cmd = data[2]
+                        count      = data[3]
+                        if len(data) < 4 + count:
+                            print("BT: identity write truncated (got {} need {})".format(
+                                len(data), 4 + count))
+                            return
+                        neighbors = list(data[4:4 + count])
+                        print("BT CMD IDENTITY_WRITE: target={} uwb_id={} neighbors={}".format(
+                            target_id, uwb_id_cmd, neighbors))
+                        if target_id == node.node_id:
+                            try:
+                                from identity import write_identity
+                                write_identity(node.node_id, uwb_id_cmd,
+                                               allowed_neighbors=neighbors or None)
+                                node.neighbours.allowlist = set(neighbors) if neighbors else None
+                                print("Identity updated: node_id={} uwb_id={} neighbors={}".format(
+                                    node.node_id, uwb_id_cmd, neighbors))
+                            except Exception as e:
+                                print("Identity write failed:", e)
+                        else:
+                            payload = bytearray([uwb_id_cmd, count] + neighbors)
+                            node.send_data(target_id, constants.APP_CTRL,
+                                           constants.CTRL_IDENTITY_WRITE, bytes(payload))
+                            print("Identity write relayed to egg_{}".format(target_id))
                     else:
                         print("BT: unknown command:", list(data))
 
