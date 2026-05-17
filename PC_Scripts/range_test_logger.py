@@ -167,6 +167,8 @@ async def _monitor(name, collector):
             if not line:
                 continue
 
+            print("[egg] " + line)
+
             if _START_RE.match(line):
                 collector.on_ping_start()
                 return
