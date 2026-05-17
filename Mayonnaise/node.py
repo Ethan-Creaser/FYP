@@ -26,6 +26,7 @@ class Node:
         self.led           = None     # set by main if NeoPixel is present
         self.bt_logger     = None     # set by main if BT is enabled
         self.localise_app  = None     # set by LocaliseApp.__init__
+        self.beacon_enabled = True    # overridden from identity.bin at boot; toggled by CTRL_BEACON
         self.start_time    = time.time()
 
         self._seq       = 1

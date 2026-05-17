@@ -1,26 +1,29 @@
 """Identity helper: read/write a small identity.bin file used to set node IDs.
 
-Format (v2): MAGIC (0xE9), node_id, uwb_id, neighbor_count, [n0, n1, ...]
+Format (v3): MAGIC (0xE9), node_id, uwb_id, neighbor_count, [n0, n1, ...], beacon_enabled
   neighbor_count = 0  → no restriction (accept all neighbors)
   neighbor_count > 0  → allowlist of that many node IDs follows
+  beacon_enabled      → 1 (default) or 0; absent in older files → treated as 1
 
+Old v2 format (no beacon_enabled byte) is read as beacon_enabled=True.
 Old 3-byte format (no neighbor_count byte) is read as "no restriction".
 
 Usage:
-  from identity import get_ids, get_allowed_neighbors, write_identity
+  from identity import get_ids, get_allowed_neighbors, get_beacon_enabled, write_identity
   node_id, uwb_id = get_ids()
   allowlist = get_allowed_neighbors()    # set or None (identity.bin only)
-  write_identity(3, uwb_id=3, allowed_neighbors=[2, 4])
+  write_identity(3, uwb_id=3, allowed_neighbors=[2, 4], beacon_enabled=True)
 """
 
 MAGIC = 0xE9
 DEFAULT_FILE = "identity.bin"
 
 
-def write_identity(node_id, uwb_id=None, allowed_neighbors=None, path=None):
+def write_identity(node_id, uwb_id=None, allowed_neighbors=None, beacon_enabled=True, path=None):
     """Write identity file.
 
     allowed_neighbors: list/iterable of node IDs, or None/[] for no restriction.
+    beacon_enabled: True (default) or False — persists across reboots.
     """
     if uwb_id is None:
         uwb_id = node_id
@@ -32,14 +35,16 @@ def write_identity(node_id, uwb_id=None, allowed_neighbors=None, path=None):
         buf.extend(nb)
     else:
         buf.append(0)
+    buf.append(1 if beacon_enabled else 0)
     with open(fn, "wb") as f:
         f.write(bytes(buf))
 
 
 def read_identity(path=None):
-    """Return (node_id, uwb_id, allowed_neighbors_or_None) or None if missing/invalid.
+    """Return (node_id, uwb_id, allowed_neighbors_or_None, beacon_enabled) or None if missing/invalid.
 
     allowed_neighbors is a set of ints, or None if no restriction is stored.
+    beacon_enabled defaults to True for files written before v3.
     """
     fn = path or DEFAULT_FILE
     try:
@@ -54,11 +59,16 @@ def read_identity(path=None):
     node_id = int(data[1])
     uwb_id  = int(data[2])
     neighbors = None
+    count = 0
     if len(data) >= 4:
         count = int(data[3])
         if count > 0 and len(data) >= 4 + count:
             neighbors = set(int(data[4 + i]) for i in range(count))
-    return (node_id, uwb_id, neighbors)
+    beacon_enabled = True
+    beacon_byte_idx = 4 + count
+    if len(data) > beacon_byte_idx:
+        beacon_enabled = bool(data[beacon_byte_idx])
+    return (node_id, uwb_id, neighbors, beacon_enabled)
 
 
 def get_ids(cfg_path="config.json"):
@@ -85,3 +95,11 @@ def get_allowed_neighbors():
     if ids is not None and ids[2] is not None:
         return ids[2]
     return None
+
+
+def get_beacon_enabled():
+    """Return beacon_enabled from identity.bin, or True if not set."""
+    ids = read_identity()
+    if ids is not None:
+        return ids[3]
+    return True

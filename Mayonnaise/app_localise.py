@@ -119,19 +119,67 @@ class LocaliseApp:
             if len(body) < 2:
                 print("[localise] IDENTITY_WRITE: payload too short")
                 return
-            uwb_id  = body[0]
-            count   = body[1]
+            uwb_id    = body[0]
+            count     = body[1]
             neighbors = list(body[2:2 + count]) if count > 0 else []
-            node_id = self.node.node_id
+            node_id   = self.node.node_id
             print("[localise] IDENTITY_WRITE: node_id={} uwb_id={} neighbors={}".format(
                 node_id, uwb_id, neighbors))
             try:
-                from identity import write_identity
-                write_identity(node_id, uwb_id, allowed_neighbors=neighbors or None)
+                from identity import write_identity, read_identity
+                existing = read_identity()
+                cur_beacon = existing[3] if existing else True
+                write_identity(node_id, uwb_id, allowed_neighbors=neighbors or None,
+                               beacon_enabled=cur_beacon)
                 self.node.neighbours.allowlist = set(neighbors) if neighbors else None
-                print("[localise] Identity updated ok")
+                # Machine-parseable confirmation (visible on this egg's own BLE/serial)
+                nb_str = ",".join(str(n) for n in neighbors)
+                print("IDENTITY_OK node_id={} uwb_id={} neighbors={}".format(
+                    node_id, uwb_id, nb_str))
+                # Send ACK back through the mesh so the gateway can relay it to the PC
+                ack = bytearray([node_id & 0xFF, uwb_id & 0xFF, len(neighbors) & 0xFF])
+                ack.extend(n & 0xFF for n in neighbors)
+                self.node.send_data(src_mesh_id, constants.APP_CTRL,
+                                    constants.CTRL_IDENTITY_ACK, bytes(ack))
             except Exception as e:
-                print("[localise] Identity write failed:", e)
+                print("[localise] IDENTITY_FAIL reason={}".format(e))
+
+        elif subtype == constants.CTRL_IDENTITY_ACK:
+            # Received by the gateway egg — forward confirmation to the PC via BLE print
+            if len(body) < 3:
+                print("[localise] IDENTITY_ACK: payload too short")
+                return
+            ack_node_id   = body[0]
+            ack_uwb_id    = body[1]
+            ack_count     = body[2]
+            ack_neighbors = list(body[3:3 + ack_count])
+            nb_str = ",".join(str(n) for n in ack_neighbors)
+            # Same IDENTITY_OK format as the direct path — PC parser handles both identically
+            print("IDENTITY_OK node_id={} uwb_id={} neighbors={}".format(
+                ack_node_id, ack_uwb_id, nb_str))
+
+        elif subtype == constants.CTRL_BEACON:
+            if len(body) < 1:
+                print("[localise] CTRL_BEACON: payload too short")
+                return
+            enabled = bool(body[0])
+            node_id = self.node.node_id
+            print("[localise] BEACON {}: node_id={}".format(
+                "ENABLE" if enabled else "DISABLE", node_id))
+            try:
+                from identity import write_identity, read_identity
+                existing = read_identity()
+                if existing:
+                    write_identity(existing[0], existing[1],
+                                   allowed_neighbors=existing[2],
+                                   beacon_enabled=enabled)
+                self.node.beacon_enabled = enabled
+                print("BEACON_OK node_id={} enabled={}".format(node_id, int(enabled)))
+                ack = bytes([node_id & 0xFF, 1 if enabled else 0])
+                self.node.send_data(src_mesh_id, constants.APP_CTRL,
+                                    constants.CTRL_IDENTITY_ACK, ack)
+            except Exception as e:
+                print("[localise] BEACON_FAIL reason={}".format(e))
 
     # ── Periodic tick (called by node.tick()) ─────────────────────────────────
 

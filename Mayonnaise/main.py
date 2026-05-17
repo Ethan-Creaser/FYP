@@ -111,6 +111,12 @@ def main():
 
     node = Node(node_id, allowlist=allowlist)
 
+    try:
+        from identity import get_beacon_enabled
+        node.beacon_enabled = get_beacon_enabled()
+    except Exception:
+        node.beacon_enabled = True
+
     if cfg.get("use_hardware"):
         ok = node.attach_hardware_from_config(cfg_path)
         if not ok:
@@ -128,7 +134,7 @@ def main():
         # attach NeoPixel LED if available
         try:
             from led_status import LEDStatus
-            _neo_pin = cfg.get("neopixel_pin", 48)
+            _neo_pin = cfg.get("neopixel_pin", 38)
             _led = LEDStatus(pin=_neo_pin)
             node.led = _led
             print("NeoPixel LED attached on pin", _neo_pin)
@@ -179,9 +185,11 @@ def main():
                 # 0xCF [target_id, uwb_id, role]              → UWB config (reconfigure + scan)
                 # 0xD0 [target_id]                            → UWB restore to identity.bin default
                 # 0xD1 [target_id, uwb_id, count, n0, n1...]  → rewrite identity.bin + live allowlist
+                # 0xD2 [target_id, 0/1]                       → disable/enable beaconing, persists
                 _BT_CMD_UWB          = 0xCF
                 _BT_CMD_UWB_RESTORE  = 0xD0
                 _BT_CMD_IDENTITY     = 0xD1
+                _BT_CMD_BEACON       = 0xD2
                 def _bt_rx(data):
                     if not data:
                         return
@@ -232,19 +240,50 @@ def main():
                             target_id, uwb_id_cmd, neighbors))
                         if target_id == node.node_id:
                             try:
-                                from identity import write_identity
+                                from identity import write_identity, read_identity
+                                existing = read_identity()
+                                cur_beacon = existing[3] if existing else True
                                 write_identity(node.node_id, uwb_id_cmd,
-                                               allowed_neighbors=neighbors or None)
+                                               allowed_neighbors=neighbors or None,
+                                               beacon_enabled=cur_beacon)
                                 node.neighbours.allowlist = set(neighbors) if neighbors else None
-                                print("Identity updated: node_id={} uwb_id={} neighbors={}".format(
-                                    node.node_id, uwb_id_cmd, neighbors))
+                                # Machine-parseable confirmation — PC script watches for this
+                                nb_str = ",".join(str(n) for n in neighbors)
+                                print("IDENTITY_OK node_id={} uwb_id={} neighbors={}".format(
+                                    node.node_id, uwb_id_cmd, nb_str))
                             except Exception as e:
-                                print("Identity write failed:", e)
+                                print("IDENTITY_FAIL reason={}".format(e))
                         else:
-                            payload = bytearray([uwb_id_cmd, count] + neighbors)
+                            mesh_payload = bytearray([uwb_id_cmd, count] + neighbors)
                             node.send_data(target_id, constants.APP_CTRL,
-                                           constants.CTRL_IDENTITY_WRITE, bytes(payload))
+                                           constants.CTRL_IDENTITY_WRITE, bytes(mesh_payload))
                             print("Identity write relayed to egg_{}".format(target_id))
+                            # IDENTITY_OK will arrive later as CTRL_IDENTITY_ACK via the mesh
+                    elif cmd == _BT_CMD_BEACON:
+                        if len(data) < 3:
+                            print("BT: beacon cmd too short:", list(data))
+                            return
+                        target_id = data[1]
+                        enabled   = bool(data[2])
+                        print("BT CMD BEACON_{}: target={}".format(
+                            "ENABLE" if enabled else "DISABLE", target_id))
+                        if target_id == node.node_id:
+                            try:
+                                from identity import write_identity, read_identity
+                                existing = read_identity()
+                                if existing:
+                                    write_identity(existing[0], existing[1],
+                                                   allowed_neighbors=existing[2],
+                                                   beacon_enabled=enabled)
+                                node.beacon_enabled = enabled
+                                print("BEACON_OK node_id={} enabled={}".format(
+                                    node.node_id, int(enabled)))
+                            except Exception as e:
+                                print("BEACON_FAIL reason={}".format(e))
+                        else:
+                            node.send_data(target_id, constants.APP_CTRL,
+                                           constants.CTRL_BEACON, bytes([1 if enabled else 0]))
+                            print("Beacon cmd relayed to egg_{}".format(target_id))
                     else:
                         print("BT: unknown command:", list(data))
 
@@ -333,7 +372,7 @@ def main():
                 # Beacon suppression: if we transmitted anything within the last
                 # beacon_interval seconds, neighbours already know we are alive.
                 # Skip this beacon and let the timer fire again next cycle.
-                if now - node._last_tx_time >= beacon_interval:
+                if node.beacon_enabled and now - node._last_tx_time >= beacon_interval:
                     node.send_beacon()
                 jitter = (random.random() - 0.5) * 2 * beacon_jitter
                 next_beacon = now + beacon_interval + jitter

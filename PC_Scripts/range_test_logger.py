@@ -101,8 +101,8 @@ async def _monitor(name, collector):
             line = line.rstrip()
 
             m = _RX_RE.search(line)
-            if m:
-                kind = m.group(1)   # DATA or ACK
+            if m and m.group(1) in ("DATA", "ACK"):
+                kind = m.group(1)
                 rssi = int(m.group(2))
                 snr  = int(m.group(3))
                 collector.add(kind, rssi, snr)
