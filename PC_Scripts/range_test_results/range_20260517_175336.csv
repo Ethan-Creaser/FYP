@@ -1,0 +1,3 @@
+distance_m,rssi_dbm,snr_db,rtt_ms,kind,pc_timestamp_ms
+0.0,-80,13,,DATA,1779004427295
+0.0,-84,12,1002,ACK,1779004430746

@@ -44,16 +44,16 @@ _OUT_DIR    = "range_test_results"
 _CSV_HEADER = ["distance_m", "rssi_dbm", "snr_db", "rtt_ms", "kind", "pc_timestamp_ms"]
 
 # [radio] RX kind=ACK src=2 dst=1 sender=2 seq=5 len=9 rssi=-75 snr=9
-_RX_RE  = re.compile(r'\[radio\] RX kind=(\w+).*rssi=(-?\d+)\s+snr=(-?\d+)')
+_RX_RE  = re.compile(r'\[radio\] RX kind=(\w+).*rssi=(-?\d+)\s+snr=(-?\d+(?:\.\d+)?)')
+
+# [radio] TX kind=DATA src=6 dst=8 sender=6 seq=1 len=15
+_TX_RE  = re.compile(r'\[radio\] TX kind=DATA.*seq=(\d+)')
 
 # [1] ACK confirmed seq=5 rtt_ms=143
-_ACK_RE = re.compile(r'\[\d+\] ACK confirmed seq=\d+ rtt_ms=(\d+)')
+_ACK_RE = re.compile(r'\[\d+\] ACK confirmed seq=(\d+) rtt_ms=(\d+)')
 
-# PING_START node=6 dst=7 n=10
-_START_RE = re.compile(r'^PING_START\s')
-
-# PING_DONE node=6 dst=7 n_sent=10
-_DONE_RE  = re.compile(r'^PING_DONE\s')
+_START_RE = re.compile(r'^PING_START')
+_DONE_RE  = re.compile(r'^PING_DONE')
 
 
 def _make_csv_path():
@@ -147,19 +147,9 @@ class Collector:
 
     def add_rx(self, kind, rssi, snr):
         ts = int(_time.time() * 1000)
-        done = False
         with self._lock:
-            if self._collecting and kind in ("DATA", "ACK"):
+            if self._collecting and kind == "ACK":
                 self._samples.append([kind, rssi, snr, None, ts])
-                # Close early once we have all expected ACKs
-                if kind == "ACK" and sum(1 for s in self._samples if s[0] == "ACK") >= self.n_samples:
-                    self._collecting = False
-                    if self._grace_timer:
-                        self._grace_timer.cancel()
-                        self._grace_timer = None
-                    done = True
-        if done:
-            self._done.set()
 
     def fill_rtt(self, rtt_ms):
         """Back-fill the RTT into the most recent ACK sample that lacks it."""
@@ -192,8 +182,6 @@ async def _monitor(name, collector):
             if not line:
                 continue
 
-            print("[egg] " + line)
-
             if _START_RE.match(line):
                 collector.on_ping_start()
                 return
@@ -202,14 +190,21 @@ async def _monitor(name, collector):
                 collector.on_ping_done()
                 return
 
+            m = _TX_RE.search(line)
+            if m:
+                print("send  seq={}".format(m.group(1)))
+                return
+
             m = _RX_RE.search(line)
-            if m and m.group(1) in ("DATA", "ACK"):
-                collector.add_rx(m.group(1), int(m.group(2)), int(m.group(3)))
+            if m and m.group(1) == "ACK":
+                print("ACK   rssi={}dBm  snr={}dB".format(m.group(2), m.group(3)))
+                collector.add_rx(m.group(1), int(m.group(2)), float(m.group(3)))
                 return
 
             m = _ACK_RE.search(line)
             if m:
-                collector.fill_rtt(int(m.group(1)))
+                print("      rtt={}ms  seq={}".format(m.group(2), m.group(1)))
+                collector.fill_rtt(int(m.group(2)))
 
     while collector.running:
         try:
@@ -267,7 +262,9 @@ Note: the gateway egg (--name) fires the pings; --target is the receiver.
     parser.add_argument("--samples", type=int,   default=10,  help="Pings per distance step (default 10)")
     args = parser.parse_args()
 
-    ping_timeout = args.samples * 0.6 + 15   # 0.4s per ping + routing/retry headroom
+    # Wait-for-ACK mode: each ping waits up to HOP_ACK_TIMEOUT * MAX_HOP_RETRIES (15 s)
+    # before giving up, plus a 10 s routing buffer for the first RREQ round-trip.
+    ping_timeout = args.samples * 15 + 10
 
     collector = Collector(n_samples=args.samples)
     csv_path  = _make_csv_path()
@@ -319,9 +316,14 @@ Note: the gateway egg (--name) fires the pings; --target is the receiver.
                 print("  ⚠  Failed to send ping command")
                 continue
 
+            collector.on_ping_start()  # reset state before wait() — BLE version arrives late
+            print("PING_START")
+
             if not collector.wait(timeout=ping_timeout):
                 print("  ⚠  Timed out waiting for PING_DONE — using partial results")
                 collector.on_ping_done()   # unblock for next step
+
+            print("PING_DONE")
 
             samples = collector.get_samples()
             if not samples:
@@ -351,6 +353,8 @@ Note: the gateway egg (--name) fires the pings; --target is the receiver.
 
             print("  → {:.2f} m | RSSI: {} | SNR: {} | RTT: {}".format(
                 dist, rssi_str, snr_str, rtt_str))
+
+            _write_csv(all_rows, csv_path)
 
             dist = round(dist + args.step, 3)
 

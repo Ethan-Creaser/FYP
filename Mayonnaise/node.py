@@ -128,6 +128,7 @@ class Node:
             if len(buf) < _MAX_PENDING_PER_DST:
                 buf.append(pkt)
             self._flood_rreq(dst)
+        return seq
 
     def _flood_rreq(self, target_id):
         """Send a RREQ for target_id unless one is already in flight."""

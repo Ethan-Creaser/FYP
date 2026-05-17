@@ -111,16 +111,8 @@ def main():
 
     node = Node(node_id, allowlist=allowlist)
 
-    # Ping state machine — set by _bt_rx, consumed by the main loop.
-    # Fires n_left DATA packets at target, one every _PING_INTERVAL_MS milliseconds.
-    try:
-        from utime import ticks_ms as _pticks, ticks_diff as _pdiff
-    except ImportError:
-        import time as _pt
-        def _pticks(): return int(_pt.time() * 1000)
-        def _pdiff(a, b): return a - b
-    _PING_INTERVAL_MS = 400   # ms between packets (safe LoRa SF9 airtime)
-    _ping_state = {"active": False, "target": 0, "n_left": 0, "n_total": 0, "last_tx": 0}
+    from range_test import PingState
+    _ping = PingState()
 
     try:
         from identity import get_beacon_enabled
@@ -279,13 +271,7 @@ def main():
                         target_id = data[1]
                         n_packets = max(1, int(data[2]))
                         print("BT CMD PING: target={} n={}".format(target_id, n_packets))
-                        _ping_state["active"] = True
-                        _ping_state["target"] = target_id
-                        _ping_state["n_left"] = n_packets
-                        _ping_state["n_total"] = n_packets
-                        _ping_state["last_tx"] = 0
-                        print("PING_START node={} dst={} n={}".format(
-                            node.node_id, target_id, n_packets))
+                        _ping.start(node.node_id, target_id, n_packets)
                     elif cmd == _BT_CMD_BEACON:
                         if len(data) < 3:
                             print("BT: beacon cmd too short:", list(data))
@@ -405,16 +391,7 @@ def main():
                 jitter = (random.random() - 0.5) * 2 * beacon_jitter
                 next_beacon = now + beacon_interval + jitter
 
-            if _ping_state["active"] and _pdiff(_pticks(), _ping_state["last_tx"]) >= _PING_INTERVAL_MS:
-                if _ping_state["n_left"] > 0:
-                    node.send_data(_ping_state["target"], constants.APP_CTRL,
-                                   constants.CTRL_PING, b"ping")
-                    _ping_state["n_left"] -= 1
-                    _ping_state["last_tx"] = _pticks()
-                else:
-                    _ping_state["active"] = False
-                    print("PING_DONE node={} dst={} n_sent={}".format(
-                        node.node_id, _ping_state["target"], _ping_state["n_total"]))
+            _ping.poll(node)
 
             # If radio exists and no background thread, poll it here (blocking short)
             if getattr(node, "radio", None) and not getattr(node.radio, "_bg_running", False):

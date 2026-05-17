@@ -1,4 +1,0 @@
-distance_m,rssi_dbm,snr_db,rtt_ms,kind,pc_timestamp_ms
-0.0,-65,9,,BCN,1778990519570
-0.0,-65,10,,BCN,1778990549871
-0.0,-64,10,,BCN,1778990608522

@@ -1,16 +1,16 @@
-"""Beacon Control — enable or disable beaconing on eggs remotely.
+"""Beacon Control — enable or disable beaconing on eggs via direct BLE sweep.
 
-Connects to a gateway egg over BLE and sends a 0xD2 command.  The gateway
-either applies the change to itself (if it is the target) or forwards it
-through the mesh to the target egg.  The change is written to identity.bin
-on the target so it persists across reboots.
+Scans for and connects to each egg individually by its BLE name, sends a
+0xD2 command directly (no mesh forwarding), waits for BEACON_OK, then moves
+to the next egg.  The change is written to identity.bin on the egg so it
+persists across reboots.
 
 Requires: pip install bleak
 
 Usage:
-    python beacon_control.py --name egg_6 --target 7 --disable
-    python beacon_control.py --name egg_6 --target 7 --enable
-    python beacon_control.py --name egg_6 --target 6 7 8 9 --disable
+    python beacon_control.py --eggs 1-8 --disable
+    python beacon_control.py --eggs 1,5,8 --enable
+    python beacon_control.py --eggs 1,3,5-8 --disable
 """
 
 import argparse
@@ -24,102 +24,127 @@ except ImportError:
     print("bleak not installed — run: pip install bleak")
     sys.exit(1)
 
-NUS_RX_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
-NUS_TX_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
+NUS_RX_UUID  = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
+NUS_TX_UUID  = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
 CMD_BEACON   = 0xD2
 SCAN_TIMEOUT = 10.0
-ACK_TIMEOUT  = 20.0   # seconds to wait for BEACON_OK per target
+ACK_TIMEOUT  = 10.0
 
 
-async def run(via_name, target_ids, enable):
+def parse_eggs(spec):
+    ids = []
+    for part in spec.split(","):
+        part = part.strip()
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            ids.extend(range(int(lo), int(hi) + 1))
+        else:
+            ids.append(int(part))
+    return sorted(set(ids))
+
+
+async def apply_one(egg_id, enable):
+    name   = "egg_{}".format(egg_id)
     action = "ENABLE" if enable else "DISABLE"
-    print("\nScanning for '{}'…".format(via_name))
-    device = await BleakScanner.find_device_by_name(via_name, timeout=SCAN_TIMEOUT)
+
+    print("\n── {} — {} beacon ──".format(name, action))
+    print("  Scanning…")
+    device = await BleakScanner.find_device_by_name(name, timeout=SCAN_TIMEOUT)
     if device is None:
-        print("ERROR: '{}' not found.".format(via_name))
+        print("  ✗ not found (timed out after {}s)".format(SCAN_TIMEOUT))
         return False
 
-    print("Found {} ({})".format(device.name, device.address))
-
-    confirmed = set()
-    buf       = ""
+    confirmed = False
+    buf = ""
 
     def on_notify(_handle, data):
-        nonlocal buf
+        nonlocal buf, confirmed
         buf += data.decode("utf-8", errors="replace")
         while "\n" in buf:
             line, buf = buf.split("\n", 1)
             line = line.rstrip()
             if line:
-                print("[egg]", line)
-            # BEACON_OK node_id=7 enabled=0
+                print("  [egg]", line)
             if line.startswith("BEACON_OK"):
-                try:
-                    parts = {k: v for k, v in (p.split("=") for p in line.split()[1:])}
-                    confirmed.add(int(parts["node_id"]))
-                except Exception:
-                    pass
+                confirmed = True
 
-    async with BleakClient(device) as client:
-        if not client.is_connected:
-            print("ERROR: failed to connect")
-            return False
+    try:
+        async with BleakClient(device) as client:
+            if not client.is_connected:
+                print("  ✗ failed to connect")
+                return False
 
-        print("Connected.\n")
-        await client.start_notify(NUS_TX_UUID, on_notify)
+            print("  Connected.")
+            await client.start_notify(NUS_TX_UUID, on_notify)
 
-        for target_id in target_ids:
-            confirmed.discard(target_id)
-            payload = bytes([CMD_BEACON, target_id & 0xFF, 1 if enable else 0])
-            print("── {} beacon on egg_{} ──".format(action, target_id))
+            payload = bytes([CMD_BEACON, egg_id & 0xFF, 1 if enable else 0])
             await client.write_gatt_char(NUS_RX_UUID, payload, response=True)
 
             deadline = _time.monotonic() + ACK_TIMEOUT
             while _time.monotonic() < deadline:
                 await asyncio.sleep(0.3)
-                if target_id in confirmed:
-                    print("  ✓ egg_{} beacon {}D".format(target_id, action.lower()[:-1]))
+                if confirmed:
                     break
-            else:
-                print("  ✗ egg_{} no confirmation (timed out after {}s)".format(
-                    target_id, ACK_TIMEOUT))
 
-        await client.stop_notify(NUS_TX_UUID)
+            await client.stop_notify(NUS_TX_UUID)
+    except Exception as exc:
+        print("  ✗ error: {}".format(exc))
+        return False
 
-    print("\nDone.")
-    return True
+    if confirmed:
+        print("  ✓ beacon {}D".format(action.lower()[:-1]))
+    else:
+        print("  ✗ no confirmation (timed out after {}s)".format(ACK_TIMEOUT))
+    return confirmed
+
+
+async def run(egg_ids, enable):
+    results = {}
+    for egg_id in egg_ids:
+        results[egg_id] = await apply_one(egg_id, enable)
+
+    action = "ENABLE" if enable else "DISABLE"
+    ok  = [i for i, r in results.items() if r]
+    bad = [i for i, r in results.items() if not r]
+
+    print("\n=== Summary ({}) ===".format(action))
+    if ok:
+        print("  ✓ eggs: {}".format(ok))
+    if bad:
+        print("  ✗ eggs: {}".format(bad))
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Enable or disable beaconing on eggs via BLE.",
+        description="Enable or disable beaconing on eggs via direct BLE sweep.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python beacon_control.py --name egg_6 --target 7 --disable
-  python beacon_control.py --name egg_6 --target 6 7 8 --enable
+  python beacon_control.py --eggs 1-8 --disable
+  python beacon_control.py --eggs 1,5,8 --enable
+  python beacon_control.py --eggs 1,3,5-8 --disable
         """,
     )
-    parser.add_argument("--name",   required=True,
-                        help="BLE name of gateway egg (e.g. egg_6)")
-    parser.add_argument("--target", required=True, nargs="+", type=int, metavar="ID",
-                        help="Target egg node ID(s)")
+    parser.add_argument("--eggs", required=True, metavar="SPEC",
+                        help="Egg range/list — e.g. '1-8', '1,5,8', '1,3,5-8'")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--enable",  action="store_true", help="Enable beaconing")
     group.add_argument("--disable", action="store_true", help="Disable beaconing")
     args = parser.parse_args()
 
-    enable = args.enable
-    action = "ENABLE" if enable else "DISABLE"
+    try:
+        egg_ids = parse_eggs(args.eggs)
+    except ValueError:
+        print("ERROR: invalid --eggs spec '{}'".format(args.eggs))
+        sys.exit(1)
 
+    action = "ENABLE" if args.enable else "DISABLE"
     print("=== Beacon Control ===")
-    print("Gateway : {}".format(args.name))
-    print("Targets : {}".format(args.target))
-    print("Action  : {}".format(action))
-    print()
+    print("Eggs   : {}".format(egg_ids))
+    print("Action : {}".format(action))
 
-    asyncio.run(run(args.name, args.target, enable))
+    asyncio.run(run(egg_ids, args.enable))
 
 
 if __name__ == "__main__":
