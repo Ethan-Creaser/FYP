@@ -74,10 +74,11 @@ def _write_csv(rows, path):
 
 class Collector:
     def __init__(self, n_samples):
-        self._lock       = threading.Lock()
-        self._samples    = []       # samples for the current ping burst
-        self._collecting = False    # True between PING_START and PING_DONE
-        self._done       = threading.Event()
+        self._lock        = threading.Lock()
+        self._samples     = []       # samples for the current ping burst
+        self._collecting  = False    # True between PING_START and PING_DONE
+        self._done        = threading.Event()
+        self._grace_timer = None
         self.n_samples   = n_samples
         self.running     = True
         # Set by the BLE thread once connected
@@ -124,17 +125,41 @@ class Collector:
             self._samples.clear()
             self._collecting = True
             self._done.clear()
+            if self._grace_timer:
+                self._grace_timer.cancel()
+            self._grace_timer = None
 
     def on_ping_done(self):
+        # All packets sent — keep collecting for 2 s so late ACKs still land.
+        # _done is set either by the grace timer or by add_rx reaching n_samples.
+        with self._lock:
+            if self._grace_timer:
+                self._grace_timer.cancel()
+            t = threading.Timer(2.0, self._grace_expire)
+            self._grace_timer = t
+        t.start()
+
+    def _grace_expire(self):
         with self._lock:
             self._collecting = False
+            self._grace_timer = None
         self._done.set()
 
     def add_rx(self, kind, rssi, snr):
         ts = int(_time.time() * 1000)
+        done = False
         with self._lock:
             if self._collecting and kind in ("DATA", "ACK"):
                 self._samples.append([kind, rssi, snr, None, ts])
+                # Close early once we have all expected ACKs
+                if kind == "ACK" and sum(1 for s in self._samples if s[0] == "ACK") >= self.n_samples:
+                    self._collecting = False
+                    if self._grace_timer:
+                        self._grace_timer.cancel()
+                        self._grace_timer = None
+                    done = True
+        if done:
+            self._done.set()
 
     def fill_rtt(self, rtt_ms):
         """Back-fill the RTT into the most recent ACK sample that lacks it."""
