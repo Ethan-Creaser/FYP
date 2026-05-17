@@ -23,6 +23,7 @@ class Node:
         self.network       = None     # set by SimNetwork.register_node
         self.radio         = None     # set by attach_hardware_from_config
         self.display       = None     # set by main if OLED is present
+        self.led           = None     # set by main if NeoPixel is present
         self.bt_logger     = None     # set by main if BT is enabled
         self.localise_app  = None     # set by LocaliseApp.__init__
         self.start_time    = time.time()
@@ -69,6 +70,12 @@ class Node:
         """
         pkt.sender_id = self.node_id
         self._last_tx_time = time.time()
+        led = getattr(self, "led", None)
+        if led:
+            try:
+                led.on_tx(pkt.kind)
+            except Exception:
+                pass
         b = pkt.to_bytes()
         if self.network is not None:
             # Sim: deliver to all topology neighbours (broadcast, like real LoRa)
@@ -154,6 +161,13 @@ class Node:
         if disp:
             try:
                 disp.update_on_rx(rssi=rssi, snr=snr, from_id=from_id, src=pkt.src)
+            except Exception:
+                pass
+
+        led = getattr(self, "led", None)
+        if led:
+            try:
+                led.on_rx(pkt.kind)
             except Exception:
                 pass
 

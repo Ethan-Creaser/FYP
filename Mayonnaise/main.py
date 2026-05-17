@@ -125,6 +125,16 @@ def main():
             except Exception as e:
                 print("Could not start radio background:", e)
 
+        # attach NeoPixel LED if available
+        try:
+            from led_status import LEDStatus
+            _neo_pin = cfg.get("neopixel_pin", 48)
+            _led = LEDStatus(pin=_neo_pin)
+            node.led = _led
+            print("NeoPixel LED attached on pin", _neo_pin)
+        except Exception as e:
+            print("NeoPixel LED init failed:", e)
+
         # attach OLED/status if available (log and force redraw)
         try:
             from oled_status import OLEDStatus
@@ -299,6 +309,13 @@ def main():
             lines.append("{}: {}".format(name, status))
         _oled.display_text("\n".join(lines))
 
+    _led = getattr(node, "led", None)
+    if _led:
+        try:
+            _led.set_idle()
+        except Exception:
+            pass
+
     beacon_interval = getattr(constants, "BEACON_INTERVAL", 30)
     beacon_jitter   = getattr(constants, "BEACON_JITTER", 5)
     next_beacon = time.time()
@@ -331,6 +348,13 @@ def main():
             # process any BLE RX buffered from the IRQ
             if getattr(node, "bt_logger", None):
                 node.bt_logger.poll()
+
+            # advance NeoPixel LED state machine
+            if getattr(node, "led", None):
+                try:
+                    node.led.poll()
+                except Exception:
+                    pass
 
             # production main: periodic application behavior only (no built-in hw test here)
 
