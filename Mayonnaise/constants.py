@@ -60,6 +60,7 @@ CTRL_UWB_RESTORE     = 3   # payload: [] — egg reverts to its identity.bin uwb
 CTRL_IDENTITY_WRITE  = 4   # payload: [uwb_id, count, n0, n1, ...] — rewrite identity.bin + live allowlist
 CTRL_IDENTITY_ACK    = 5   # payload: [node_id, uwb_id, count, n0, n1, ...] — confirmation sent back to requester
 CTRL_BEACON          = 6   # payload: [0=disable | 1=enable] — toggle beaconing, persists to identity.bin
+CTRL_PING            = 7   # payload: [] — receiver does nothing; sender uses ACK for RSSI/RTT measurement
 
 # ── Packet-kind colours ───────────────────────────────────────────────────────
 COLOUR_BEACON = (255, 165,   0)   # Orange

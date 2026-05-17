@@ -111,6 +111,11 @@ def main():
 
     node = Node(node_id, allowlist=allowlist)
 
+    # Ping state machine — set by _bt_rx, consumed by the main loop.
+    # Fires n_left DATA packets at target, one every _PING_INTERVAL seconds.
+    _PING_INTERVAL = 0.4   # seconds between packets (safe LoRa SF9 airtime)
+    _ping_state = {"active": False, "target": 0, "n_left": 0, "n_total": 0, "last_tx": 0.0}
+
     try:
         from identity import get_beacon_enabled
         node.beacon_enabled = get_beacon_enabled()
@@ -186,10 +191,12 @@ def main():
                 # 0xD0 [target_id]                            → UWB restore to identity.bin default
                 # 0xD1 [target_id, uwb_id, count, n0, n1...]  → rewrite identity.bin + live allowlist
                 # 0xD2 [target_id, 0/1]                       → disable/enable beaconing, persists
+                # 0xD3 [target_id, n_packets]                 → fire n_packets pings at target (RSSI/RTT test)
                 _BT_CMD_UWB          = 0xCF
                 _BT_CMD_UWB_RESTORE  = 0xD0
                 _BT_CMD_IDENTITY     = 0xD1
                 _BT_CMD_BEACON       = 0xD2
+                _BT_CMD_PING         = 0xD3
                 def _bt_rx(data):
                     if not data:
                         return
@@ -259,6 +266,20 @@ def main():
                                            constants.CTRL_IDENTITY_WRITE, bytes(mesh_payload))
                             print("Identity write relayed to egg_{}".format(target_id))
                             # IDENTITY_OK will arrive later as CTRL_IDENTITY_ACK via the mesh
+                    elif cmd == _BT_CMD_PING:
+                        if len(data) < 3:
+                            print("BT: ping too short:", list(data))
+                            return
+                        target_id = data[1]
+                        n_packets = max(1, int(data[2]))
+                        print("BT CMD PING: target={} n={}".format(target_id, n_packets))
+                        _ping_state["active"] = True
+                        _ping_state["target"] = target_id
+                        _ping_state["n_left"] = n_packets
+                        _ping_state["n_total"] = n_packets
+                        _ping_state["last_tx"] = 0.0
+                        print("PING_START node={} dst={} n={}".format(
+                            node.node_id, target_id, n_packets))
                     elif cmd == _BT_CMD_BEACON:
                         if len(data) < 3:
                             print("BT: beacon cmd too short:", list(data))
@@ -376,6 +397,17 @@ def main():
                     node.send_beacon()
                 jitter = (random.random() - 0.5) * 2 * beacon_jitter
                 next_beacon = now + beacon_interval + jitter
+
+            if _ping_state["active"] and now - _ping_state["last_tx"] >= _PING_INTERVAL:
+                if _ping_state["n_left"] > 0:
+                    node.send_data(_ping_state["target"], constants.APP_CTRL,
+                                   constants.CTRL_PING, b"ping")
+                    _ping_state["n_left"] -= 1
+                    _ping_state["last_tx"] = now
+                else:
+                    _ping_state["active"] = False
+                    print("PING_DONE node={} dst={} n_sent={}".format(
+                        node.node_id, _ping_state["target"], _ping_state["n_total"]))
 
             # If radio exists and no background thread, poll it here (blocking short)
             if getattr(node, "radio", None) and not getattr(node.radio, "_bg_running", False):
