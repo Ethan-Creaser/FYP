@@ -287,6 +287,14 @@ Note: the gateway egg (--name) fires the pings; --target is the receiver.
     print()
 
     try:
+        while not collector.connected:
+            _time.sleep(0.5)
+
+        try:
+            input("  Connected — press Enter to start, or Ctrl+C to quit: ")
+        except EOFError:
+            pass
+
         while True:
             prompt = "  [dist={:.2f}m] Press Enter to fire {} pings (or 'q' to quit): ".format(
                 dist, args.samples)
@@ -299,7 +307,10 @@ Note: the gateway egg (--name) fires the pings; --target is the receiver.
                 break
 
             if not collector.connected:
-                print("  ⚠  Not connected yet — waiting for BLE link")
+                print("  ⚠  Not connected — waiting for BLE link")
+                while not collector.connected:
+                    _time.sleep(0.5)
+                print("  Reconnected.")
                 continue
 
             print("  Firing {} ping(s) at egg_{}…".format(args.samples, args.target))
