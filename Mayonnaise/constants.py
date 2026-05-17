@@ -58,3 +58,17 @@ CTRL_UWB_CONFIG      = 1   # payload: [uwb_id, role]
 CTRL_UWB_SCAN_RESULT = 2   # payload: [uwb_id, role, slot, dist_mm_hi, dist_mm_lo, ...]
 CTRL_UWB_RESTORE     = 3   # payload: [] — egg reverts to its identity.bin uwb_id, role=1
 CTRL_IDENTITY_WRITE  = 4   # payload: [uwb_id, count, n0, n1, ...] — rewrite identity.bin + live allowlist
+CTRL_IDENTITY_ACK    = 5   # payload: [node_id, uwb_id, count, n0, n1, ...] — confirmation sent back to requester
+
+# ── Packet-kind colours ───────────────────────────────────────────────────────
+COLOUR_BEACON = (255, 165,   0)   # Orange
+COLOUR_DATA   = (255,   0, 255)   # Magenta
+COLOUR_BCAST  = (255, 255,   0)   # Yellow
+COLOUR_ACK    = (  0, 255,   0)   # Green
+
+# ── System-state colours ──────────────────────────────────────────────────────
+COLOUR_IDLE   = (  0, 255, 255)   # Cyan
+COLOUR_BOOT   = (255, 255, 255)   # White
+COLOUR_TX     = (  0,   0, 255)   # Blue
+COLOUR_RX     = (128,   0, 128)   # Purple
+COLOUR_ERROR  = (255,   0,   0)   # Red

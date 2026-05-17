@@ -3,9 +3,9 @@
 State machine (non-blocking):
   BOOT  -> white until set_idle() or first packet
   TX    -> COLOUR_TX (blue) for _PHASE_DIR_MS
-  RX    -> COLOUR_RX (green) for _PHASE_DIR_MS
+  RX    -> COLOUR_RX (purple) for _PHASE_DIR_MS
   KIND  -> packet-kind colour for _PHASE_KIND_MS
-  IDLE  -> COLOUR_IDLE (off)
+  IDLE  -> COLOUR_IDLE (cyan)
   ERROR -> COLOUR_ERROR (red, sticky until cleared)
 """
 
@@ -57,7 +57,7 @@ def _kind_to_colour(kind):
 class LEDStatus:
     """Single-pixel NeoPixel status indicator."""
 
-    def __init__(self, pin=48, num_leds=1):
+    def __init__(self, pin=38, num_leds=1):
         self._active = False
         if not HAVE_HW:
             return
