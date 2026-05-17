@@ -352,6 +352,7 @@ def main():
         else:
             status = "FAIL"
         print("  {:<8} {}".format(name, status))
+    print("  {:<8} {}".format("beacon", "ON" if node.beacon_enabled else "OFF"))
     print("=" * 32)
 
     _oled = getattr(node, "display", None)
