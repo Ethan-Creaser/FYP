@@ -7,6 +7,14 @@ No typing imports. No dataclasses. No __future__ annotations.
 import time
 import json
 
+try:
+    from utime import ticks_ms as _ticks_ms, ticks_diff as _ticks_diff
+except ImportError:
+    def _ticks_ms():
+        return int(time.time() * 1000)
+    def _ticks_diff(a, b):
+        return a - b
+
 import constants
 import packets
 from neighbour_table import NeighbourTable
@@ -107,7 +115,7 @@ class Node:
             src=self.node_id, dst=dst, seq=seq, ttl=ttl,
             app_id=app_id, subtype=subtype, data=data
         )
-        self.outstanding[(self.node_id, seq)] = [time.time(), pkt, dst, 1]
+        self.outstanding[(self.node_id, seq)] = [time.time(), pkt, dst, 1, _ticks_ms()]
 
         next_hop = self.routes.get_next_hop(dst)
         print("[{}] SEND dst={} seq={} app={} sub={} next_hop={}".format(
@@ -430,8 +438,8 @@ class Node:
 
         if orig_src == self.node_id and key in self.outstanding:
             # This ACK confirms a packet we originated
-            sent_time = self.outstanding[key][0]
-            rtt_ms = int((time.time() - sent_time) * 1000)
+            entry  = self.outstanding[key]
+            rtt_ms = _ticks_diff(_ticks_ms(), entry[4]) if len(entry) > 4 else int((time.time() - entry[0]) * 1000)
             print("[{}] ACK confirmed seq={} rtt_ms={}".format(self.node_id, orig_seq, rtt_ms))
             del self.outstanding[key]
             disp = getattr(self, "display", None)

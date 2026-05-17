@@ -242,7 +242,7 @@ Note: the gateway egg (--name) fires the pings; --target is the receiver.
     parser.add_argument("--samples", type=int,   default=10,  help="Pings per distance step (default 10)")
     args = parser.parse_args()
 
-    ping_timeout = args.samples * 0.5 + 10   # generous: 0.4s per ping + 10s headroom
+    ping_timeout = args.samples * 0.6 + 15   # 0.4s per ping + routing/retry headroom
 
     collector = Collector(n_samples=args.samples)
     csv_path  = _make_csv_path()
