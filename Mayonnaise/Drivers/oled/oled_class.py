@@ -14,6 +14,7 @@ class OLED:
         self.height = height
         addr = 60
         self.display = ssd1306.SSD1306_I2C(width, height, i2c, addr=addr)  # type: ignore
+        self.display_text(f"Oled Connected", clear=True)
 
     def display_text(self, text, x=0, y=0, clear=True):
         if clear:

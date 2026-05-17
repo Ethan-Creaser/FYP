@@ -185,28 +185,48 @@ def plot_map(coords_dict, measurements, out_path=None):
 
 # ── Orientation ──────────────────────────────────────────────────────────────
 
-def orient_coords(coords_dict, bl_egg, tr_egg):
-    """Rotate all coordinates so bl_egg is bottom-left and tr_egg is top-right."""
-    missing = [e for e in [bl_egg, tr_egg] if e not in coords_dict]
+def orient_coords(coords_dict, bottom_egg, top_egg, left_egg=None):
+    """Rotate (and optionally reflect) coordinates so bottom_egg is at the bottom
+    and top_egg is at the top. If left_egg is given, it resolves the mirror-image
+    ambiguity: it must end up to the left of the bottom→top axis."""
+    missing = [e for e in [bottom_egg, top_egg] if e not in coords_dict]
     if missing:
         print("WARNING: orientation egg(s) {} not in solution — skipping orientation.".format(missing))
         return coords_dict
 
-    x_bl, y_bl = coords_dict[bl_egg][0], coords_dict[bl_egg][1]
-    x_tr, y_tr = coords_dict[tr_egg][0], coords_dict[tr_egg][1]
+    x_b, y_b = coords_dict[bottom_egg][0], coords_dict[bottom_egg][1]
+    x_t, y_t = coords_dict[top_egg][0],    coords_dict[top_egg][1]
 
-    current_angle = math.atan2(y_tr - y_bl, x_tr - x_bl)
-    target_angle  = math.pi / 4   # 45° = northeast direction
+    current_angle = math.atan2(y_t - y_b, x_t - x_b)
+    target_angle  = math.pi / 2   # 90° = straight up
     phi = target_angle - current_angle
-
     cos_phi, sin_phi = math.cos(phi), math.sin(phi)
 
-    return {
+    rotated = {
         nid: (x * cos_phi - y * sin_phi,
               x * sin_phi + y * cos_phi,
               z)
         for nid, (x, y, z) in coords_dict.items()
     }
+
+    if left_egg is not None:
+        if left_egg not in rotated:
+            print("WARNING: --left egg_{} not in solution — skipping reflection check.".format(left_egg))
+            return rotated
+
+        rx_b, ry_b = rotated[bottom_egg][0], rotated[bottom_egg][1]
+        rx_t, ry_t = rotated[top_egg][0],    rotated[top_egg][1]
+        rx_l, ry_l = rotated[left_egg][0],   rotated[left_egg][1]
+
+        # 2D cross product: positive = left_egg is to the left of bottom→top
+        cross = (rx_t - rx_b) * (ry_l - ry_b) - (ry_t - ry_b) * (rx_l - rx_b)
+
+        if cross < 0:
+            # Mirror image — reflect about the vertical axis (negate x)
+            rotated = {nid: (-x, y, z) for nid, (x, y, z) in rotated.items()}
+            print("  reflection applied (egg_{} was on wrong side).".format(left_egg))
+
+    return rotated
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -218,10 +238,12 @@ def main():
                         help="Path to CSV file (default: most recent file in localisation_tests/)")
     parser.add_argument("--out", default=None,
                         help="Save plot to file instead of displaying (e.g. map.png)")
-    parser.add_argument("--bottom-left", type=int, default=None, metavar="EGG_ID",
-                        help="Egg ID to anchor in the bottom-left for orientation")
-    parser.add_argument("--top-right", type=int, default=None, metavar="EGG_ID",
-                        help="Egg ID to anchor in the top-right for orientation")
+    parser.add_argument("--bottom", type=int, default=None, metavar="EGG_ID",
+                        help="Egg ID to place at the bottom")
+    parser.add_argument("--top", type=int, default=None, metavar="EGG_ID",
+                        help="Egg ID to place at the top")
+    parser.add_argument("--left", type=int, default=None, metavar="EGG_ID",
+                        help="Egg ID that should appear to the left of the bottom→top axis (fixes mirror-image flip)")
     parser.add_argument("--uwb-map-file", default="uwb_id_map.txt", metavar="FILE",
                         help="Path to txt file mapping egg IDs to UWB slot IDs. "
                              "One 'egg_id:uwb_id' entry per line. Lines starting with # are ignored. "
@@ -288,12 +310,13 @@ def main():
         print("Solver returned no positions.")
         sys.exit(1)
 
-    if args.bottom_left is not None and args.top_right is not None:
-        print("Orienting: egg_{} → bottom-left, egg_{} → top-right...".format(
-            args.bottom_left, args.top_right))
-        coords_dict = orient_coords(coords_dict, args.bottom_left, args.top_right)
-    elif (args.bottom_left is None) != (args.top_right is None):
-        print("WARNING: provide both --bottom-left and --top-right to orient the map.")
+    if args.bottom is not None and args.top is not None:
+        print("Orienting: egg_{} → bottom, egg_{} → top{}...".format(
+            args.bottom, args.top,
+            ", egg_{} → left".format(args.left) if args.left is not None else ""))
+        coords_dict = orient_coords(coords_dict, args.bottom, args.top, left_egg=args.left)
+    elif (args.bottom is None) != (args.top is None):
+        print("WARNING: provide both --bottom and --top to orient the map.")
 
     print("\nSolved positions:")
     for nid in sorted(coords_dict):

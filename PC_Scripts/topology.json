@@ -1,0 +1,8 @@
+{
+    "egg_6": {"uwb_id": 6, "neighbors": [7, 10]},
+    "egg_7": {"uwb_id": 7, "neighbors": [6, 8, 9]},
+    "egg_8": {"uwb_id": 5, "neighbors": [7]},
+    "egg_9": {"uwb_id": 1, "neighbors": [7,10]},
+    "egg_10": {"uwb_id": 2, "neighbors": [9, 6]}
+    
+}

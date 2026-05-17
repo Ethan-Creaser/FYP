@@ -35,6 +35,10 @@ class OLEDStatus:
         self.last_rx_from = None
         self.start_time = None
 
+    def display_text(self, text, x=0, y=0, clear=True):
+        if self.oled:
+            self.oled.display_text(text, x=x, y=y, clear=clear)
+
     def attach_node(self, node):
         """Attach a `Node` instance so the display can show node-specific vitals."""
         self.node = node
@@ -104,6 +108,4 @@ class OLEDStatus:
             except Exception:
                 print("OLED redraw failed;", lines)
         else:
-            #print("OLED:")
-            for l in lines:
-                #print("  ", l)
+            pass

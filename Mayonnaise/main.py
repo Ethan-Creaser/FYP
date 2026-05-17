@@ -270,6 +270,7 @@ def main():
         ("oled",  getattr(node, "display",   None) is not None,   cfg.get("use_hardware")),
         ("uwb",   _loc is not None and getattr(_loc, "uwb", None) is not None, cfg.get("use_uwb")),
     ]
+    
     print("=" * 32)
     print("  Mayonnaise v{}  node {}".format(VERSION, node_id))
     print("  " + "-" * 28)
@@ -282,6 +283,21 @@ def main():
             status = "FAIL"
         print("  {:<8} {}".format(name, status))
     print("=" * 32)
+
+    _oled = getattr(node, "display", None)
+    if _oled is not None:
+        lines = ["v{}  node {}".format(VERSION, node_id)]
+        for name, ok, wanted in _hw:
+            if name == "oled":
+                continue
+            if not wanted:
+                status = "off"
+            elif ok:
+                status = "OK"
+            else:
+                status = "FAIL"
+            lines.append("{}: {}".format(name, status))
+        _oled.display_text("\n".join(lines))
 
     beacon_interval = getattr(constants, "BEACON_INTERVAL", 30)
     beacon_jitter   = getattr(constants, "BEACON_JITTER", 5)
