@@ -192,7 +192,7 @@ async def _monitor(name, collector):
             if not line:
                 continue
 
-            if "[radio] TX" in line or "[radio] RX kind=ACK" in line or "ACK confirmed" in line or _START_RE.match(line) or _DONE_RE.match(line):
+            if "ACK confirmed" in line or _START_RE.match(line) or _DONE_RE.match(line):
                 print("[egg] " + line)
 
             if _START_RE.match(line):
