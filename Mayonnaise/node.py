@@ -415,7 +415,9 @@ class Node:
 
         if orig_src == self.node_id and key in self.outstanding:
             # This ACK confirms a packet we originated
-            print("[{}] ACK confirmed seq={}".format(self.node_id, orig_seq))
+            sent_time = self.outstanding[key][0]
+            rtt_ms = int((time.time() - sent_time) * 1000)
+            print("[{}] ACK confirmed seq={} rtt_ms={}".format(self.node_id, orig_seq, rtt_ms))
             del self.outstanding[key]
             disp = getattr(self, "display", None)
             if disp:
