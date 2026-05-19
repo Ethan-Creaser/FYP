@@ -350,6 +350,10 @@ class Node:
         if app_id == constants.APP_ROUTING:
             self._handle_routing_bcast(subtype, body, from_id, pkt)
         else:
+            # Opportunistically cache a reverse route to the BCAST originator so
+            # any unicast reply (e.g. CTRL_NEIGHBOURS_REPORT) doesn't need RREQ.
+            hops = (constants.MAX_TTL - pkt.ttl) + 1
+            self.routes.set_route(pkt.src, from_id, hops)
             self._deliver_bcast_to_app(pkt, app_id, subtype, body)
 
         # Rebroadcast with decremented TTL
