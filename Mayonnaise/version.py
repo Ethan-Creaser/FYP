@@ -1,2 +1,2 @@
 # Increment before flashing a new build so each egg can confirm its firmware.
-VERSION = "0.4.1"
+VERSION = "0.4.2"

@@ -54,13 +54,15 @@ ROUTING_RREP     = 2
 ROUTING_RECOVERY = 3
 
 # ── APP_CTRL subtypes ─────────────────────────────────────────────────────────
-CTRL_UWB_CONFIG      = 1   # payload: [uwb_id, role]
-CTRL_UWB_SCAN_RESULT = 2   # payload: [uwb_id, role, slot, dist_mm_hi, dist_mm_lo, ...]
-CTRL_UWB_RESTORE     = 3   # payload: [] — egg reverts to its identity.bin uwb_id, role=1
-CTRL_IDENTITY_WRITE  = 4   # payload: [uwb_id, count, n0, n1, ...] — rewrite identity.bin + live allowlist
-CTRL_IDENTITY_ACK    = 5   # payload: [node_id, uwb_id, count, n0, n1, ...] — confirmation sent back to requester
-CTRL_BEACON          = 6   # payload: [0=disable | 1=enable] — toggle beaconing, persists to identity.bin
-CTRL_PING            = 7   # payload: [] — receiver does nothing; sender uses ACK for RSSI/RTT measurement
+CTRL_UWB_CONFIG        = 1   # payload: [uwb_id, role]
+CTRL_UWB_SCAN_RESULT   = 2   # payload: [uwb_id, role, slot, dist_mm_hi, dist_mm_lo, ...]
+CTRL_UWB_RESTORE       = 3   # payload: [] — egg reverts to its identity.bin uwb_id, role=1
+CTRL_IDENTITY_WRITE    = 4   # payload: [uwb_id, count, n0, n1, ...] — rewrite identity.bin + live allowlist
+CTRL_IDENTITY_ACK      = 5   # payload: [node_id, uwb_id, count, n0, n1, ...] — confirmation sent back to requester
+CTRL_BEACON            = 6   # payload: [0=disable | 1=enable] — toggle beaconing, persists to identity.bin
+CTRL_PING              = 7   # payload: [] — receiver does nothing; sender uses ACK for RSSI/RTT measurement
+CTRL_GET_NEIGHBOURS    = 8   # payload: [] — request alive neighbour table; egg replies with CTRL_NEIGHBOURS_REPORT
+CTRL_NEIGHBOURS_REPORT = 9   # payload: [node_id, count, n0, n1, ...] — alive neighbours, sent to GROUND_STATION_ID
 
 # ── Packet-kind colours ───────────────────────────────────────────────────────
 COLOUR_BEACON = (255, 165,   0)   # Orange

@@ -19,16 +19,19 @@ MAGIC = 0xE9
 DEFAULT_FILE = "identity.bin"
 
 
+UWB_NONE = 0xFF   # sentinel stored in identity.bin meaning "no UWB attached"
+
+
 def write_identity(node_id, uwb_id=None, allowed_neighbors=None, beacon_enabled=True, path=None):
     """Write identity file.
 
     allowed_neighbors: list/iterable of node IDs, or None/[] for no restriction.
     beacon_enabled: True (default) or False — persists across reboots.
+    uwb_id=None writes UWB_NONE (0xFF) — main.py will skip UWB initialisation.
     """
-    if uwb_id is None:
-        uwb_id = node_id
+    stored_uwb = UWB_NONE if uwb_id is None else (int(uwb_id) & 0xFF)
     fn = path or DEFAULT_FILE
-    buf = bytearray([MAGIC, int(node_id) & 0xFF, int(uwb_id) & 0xFF])
+    buf = bytearray([MAGIC, int(node_id) & 0xFF, stored_uwb])
     if allowed_neighbors:
         nb = [int(n) & 0xFF for n in allowed_neighbors]
         buf.append(len(nb) & 0xFF)
@@ -57,7 +60,7 @@ def read_identity(path=None):
     if data[0] != MAGIC:
         return None
     node_id = int(data[1])
-    uwb_id  = int(data[2])
+    uwb_id  = None if data[2] == UWB_NONE else int(data[2])
     neighbors = None
     count = 0
     if len(data) >= 4:
@@ -82,9 +85,7 @@ def get_ids(cfg_path="config.json"):
             cfg = json.load(f)
         node = int(cfg.get("node_id", 1))
         uwb = cfg.get("uwb_id")
-        if uwb is None:
-            uwb = node
-        return (int(node), int(uwb))
+        return (node, None if uwb is None else int(uwb))
     except Exception:
         return (1, 1)
 

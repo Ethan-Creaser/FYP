@@ -190,11 +190,13 @@ def main():
                 # 0xD1 [target_id, uwb_id, count, n0, n1...]  → rewrite identity.bin + live allowlist
                 # 0xD2 [target_id, 0/1]                       → disable/enable beaconing, persists
                 # 0xD3 [target_id, n_packets]                 → fire n_packets pings at target (RSSI/RTT test)
-                _BT_CMD_UWB          = 0xCF
-                _BT_CMD_UWB_RESTORE  = 0xD0
-                _BT_CMD_IDENTITY     = 0xD1
-                _BT_CMD_BEACON       = 0xD2
-                _BT_CMD_PING         = 0xD3
+                # 0xD4 [target_id]                            → query alive neighbours (0xFF = broadcast all)
+                _BT_CMD_UWB             = 0xCF
+                _BT_CMD_UWB_RESTORE     = 0xD0
+                _BT_CMD_IDENTITY        = 0xD1
+                _BT_CMD_BEACON          = 0xD2
+                _BT_CMD_PING            = 0xD3
+                _BT_CMD_GET_NEIGHBOURS  = 0xD4
                 def _bt_rx(data):
                     if not data:
                         return
@@ -297,6 +299,37 @@ def main():
                             node.send_data(target_id, constants.APP_CTRL,
                                            constants.CTRL_BEACON, bytes([1 if enabled else 0]))
                             print("Beacon cmd relayed to egg_{}".format(target_id))
+                    elif cmd == _BT_CMD_GET_NEIGHBOURS:
+                        if len(data) < 2:
+                            print("BT: get_neighbours too short:", list(data))
+                            return
+                        target_id = data[1]
+                        if target_id == 0xFF:
+                            import packets as _packets
+                            seq = node.next_seq()
+                            pkt = _packets.make_bcast(
+                                src=node.node_id, seq=seq, ttl=constants.MAX_TTL,
+                                app_id=constants.APP_CTRL,
+                                subtype=constants.CTRL_GET_NEIGHBOURS,
+                                data=b"",
+                            )
+                            node.send_packet(pkt)
+                            print("GET_NEIGHBOURS broadcast sent seq={}".format(seq))
+                            # Also report egg_99's own neighbours immediately
+                            _loc = getattr(node, "localise_app", None)
+                            if _loc:
+                                try:
+                                    _loc.on_ctrl(node.node_id, constants.CTRL_GET_NEIGHBOURS, b"")
+                                except Exception as _e:
+                                    print("GET_NEIGHBOURS self-report error:", _e)
+                        else:
+                            node.send_data(
+                                target_id,
+                                constants.APP_CTRL,
+                                constants.CTRL_GET_NEIGHBOURS,
+                                b"",
+                            )
+                            print("GET_NEIGHBOURS sent to egg_{}".format(target_id))
                     else:
                         print("BT: unknown command:", list(data))
 
@@ -316,11 +349,14 @@ def main():
 
         # attach UWB module into localise_app (requires localise_app to exist)
         if cfg.get("use_uwb"):
-            loc = getattr(node, "localise_app", None)
-            if loc is None:
-                print("UWB init skipped: localisation_enabled must be true to use UWB")
+            if uwb_id is None:
+                print("UWB init skipped: uwb_id=None in identity.bin")
             else:
-                _attach_uwb(loc, cfg, uwb_id)
+                loc = getattr(node, "localise_app", None)
+                if loc is None:
+                    print("UWB init skipped: localisation_enabled must be true to use UWB")
+                else:
+                    _attach_uwb(loc, cfg, uwb_id)
 
         # production: no periodic hardware test in main.py (use Debug/hw_runner.py)
 

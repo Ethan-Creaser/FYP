@@ -360,6 +360,12 @@ class Node:
     def _deliver_bcast_to_app(self, pkt, app_id, subtype, body):
         print("[{}] BCAST src={} app={} sub={} len={}".format(
             self.node_id, pkt.src, app_id, subtype, len(body)))
+        loc = getattr(self, "localise_app", None)
+        if loc and app_id == constants.APP_CTRL:
+            try:
+                loc.on_ctrl(pkt.src, subtype, body)
+            except Exception as e:
+                print("[{}] localise bcast ctrl error: {}".format(self.node_id, e))
 
     # ── Routing ───────────────────────────────────────────────────────────────
 
@@ -441,7 +447,8 @@ class Node:
             # This ACK confirms a packet we originated
             entry  = self.outstanding[key]
             rtt_ms = _ticks_diff(_ticks_ms(), entry[4]) if len(entry) > 4 else int((time.time() - entry[0]) * 1000)
-            print("[{}] ACK confirmed seq={} rtt_ms={}".format(self.node_id, orig_seq, rtt_ms))
+            print("[{}] ACK confirmed seq={} from={} dst={} rtt_ms={}".format(
+                self.node_id, orig_seq, from_id, entry[2], rtt_ms))
             del self.outstanding[key]
             disp = getattr(self, "display", None)
             if disp:

@@ -39,8 +39,9 @@ Requirements:
 
 import argparse
 import asyncio
-import json
 import sys
+
+from topology import Topology
 
 try:
     from bleak import BleakClient, BleakScanner
@@ -58,13 +59,10 @@ ACK_WAIT        = 4.0    # seconds to listen for the egg's confirmation print
 
 def _node_id_from_name(name):
     """Parse node_id from 'egg_<N>' → N.  Raises ValueError if not parseable."""
-    parts = name.lower().split("_")
-    if len(parts) >= 2:
-        try:
-            return int(parts[-1])
-        except ValueError:
-            pass
-    raise ValueError("Cannot parse node_id from BLE name '{}'".format(name))
+    try:
+        return int(str(name).lower().removeprefix("egg_"))
+    except ValueError:
+        raise ValueError("Cannot parse node_id from BLE name '{}'".format(name))
 
 
 def _build_payload(target_id, uwb_id, neighbors):
@@ -162,82 +160,24 @@ async def write_via_gateway(via_name, entries):
 # Entry point
 # ---------------------------------------------------------------------------
 
-def check_topology(raw):
-    """Validate that every neighbor relationship is bidirectional.
-
-    For every egg A that lists egg B as a neighbor, egg B must also list egg A.
-    Prints a summary and returns True if clean, False if asymmetric edges exist.
-    """
-    # Build node_id → neighbors mapping for every entry that declares neighbors
-    node_neighbors = {}
-    node_name = {}   # node_id → ble_name (for readable messages)
-    for ble_name, spec in raw.items():
-        try:
-            nid = _node_id_from_name(ble_name)
-        except ValueError:
-            continue
-        node_name[nid] = ble_name
-        nb = spec.get("neighbors")
-        if nb is not None:             # explicit list (even empty) — not "unrestricted"
-            node_neighbors[nid] = set(int(n) for n in nb)
-
-    asymmetric = []   # list of (a, b) where A sees B but B doesn't see A
-
-    for nid, neighbors in node_neighbors.items():
-        for other in neighbors:
-            if other not in node_neighbors:
-                # other egg isn't in the file at all — can't verify
-                continue
-            if nid not in node_neighbors[other]:
-                asymmetric.append((nid, other))
-
-    if not asymmetric:
-        print("Topology check: OK — all neighbor relationships are symmetric.")
-        return True
-
-    print("Topology check: ASYMMETRIC EDGES DETECTED")
-    print("-" * 48)
-    seen = set()
-    for a, b in asymmetric:
-        pair = (min(a, b), max(a, b))
-        if pair in seen:
-            continue
-        seen.add(pair)
-        a_sees_b = b in node_neighbors.get(a, set())
-        b_sees_a = a in node_neighbors.get(b, set())
-        a_name = node_name.get(a, "egg_{}".format(a))
-        b_name = node_name.get(b, "egg_{}".format(b))
-        if a_sees_b and not b_sees_a:
-            print("  {} lists {} as neighbor  BUT  {} does NOT list {}".format(
-                a_name, b_name, b_name, a_name))
-        elif b_sees_a and not a_sees_b:
-            print("  {} lists {} as neighbor  BUT  {} does NOT list {}".format(
-                b_name, a_name, a_name, b_name))
-    print("-" * 48)
-    return False
-
-
 def _load_topology(path):
     try:
-        with open(path, "r") as f:
-            raw = json.load(f)
+        topo = Topology.load(path)
     except Exception as e:
         print("Cannot read topology file '{}': {}".format(path, e))
         sys.exit(1)
 
-    check_topology(raw)   # always validate; warns but does not abort
+    issues = topo.validate()
+    if not issues:
+        print("Topology check: OK — all neighbour relationships are symmetric.")
+    else:
+        print("Topology check: ASYMMETRIC EDGES DETECTED")
+        print("-" * 48)
+        for issue in issues:
+            print(" ", issue)
+        print("-" * 48)
 
-    entries = []
-    for ble_name, spec in raw.items():
-        try:
-            node_id = _node_id_from_name(ble_name)
-        except ValueError as e:
-            print("Skipping '{}': {}".format(ble_name, e))
-            continue
-        uwb_id    = int(spec.get("uwb_id", node_id))
-        neighbors = [int(n) for n in spec.get("neighbors", [])]
-        entries.append((ble_name, node_id, uwb_id, neighbors))
-    return entries
+    return list(topo.entries())
 
 
 def main():
@@ -275,13 +215,20 @@ Examples:
             print("--check requires a topology file")
             sys.exit(1)
         try:
-            with open(args.file, "r") as f:
-                raw = json.load(f)
+            topo = Topology.load(args.file)
         except Exception as e:
             print("Cannot read '{}': {}".format(args.file, e))
             sys.exit(1)
-        ok = check_topology(raw)
-        sys.exit(0 if ok else 1)
+        issues = topo.validate()
+        if not issues:
+            print("Topology check: OK — all neighbour relationships are symmetric.")
+            sys.exit(0)
+        print("Topology check: ASYMMETRIC EDGES DETECTED")
+        print("-" * 48)
+        for issue in issues:
+            print(" ", issue)
+        print("-" * 48)
+        sys.exit(1)
 
     if args.egg:
         # inline single-egg mode

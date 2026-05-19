@@ -62,7 +62,19 @@ class HardwareRadio:
             "signal_bandwidth": lconf.get("bandwidth", 125000),
             "spreading_factor": lconf.get("spreading_factor", 9),
         }
-        self.lora = ULoRa(spi, pins_map, parameters=params)
+        last_err = None
+        for attempt in range(1, 4):
+            try:
+                self.lora = ULoRa(spi, pins_map, parameters=params)
+                break
+            except Exception as e:
+                last_err = e
+                print("[radio] LoRa init attempt {}/3 failed: {}".format(attempt, e))
+                if attempt < 3:
+                    import time
+                    time.sleep_ms(200)
+        else:
+            raise RuntimeError("LoRa init failed after 3 attempts: {}".format(last_err))
         self._bg_running = False
         self._tx_queue = []   # bytes queued by main thread while bg thread owns the radio
         # LBT/CAD parameters (tunable via config.json -> "lbt" block)

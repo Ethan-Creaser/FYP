@@ -181,6 +181,35 @@ class LocaliseApp:
             except Exception as e:
                 print("[localise] BEACON_FAIL reason={}".format(e))
 
+        elif subtype == constants.CTRL_GET_NEIGHBOURS:
+            alive = self.node.neighbours.get_alive()
+            ids = [e.node_id for e in alive]
+            node_id = self.node.node_id
+            print("[localise] GET_NEIGHBOURS: node_id={} alive={}".format(node_id, ids))
+            payload = bytearray([node_id & 0xFF, len(ids) & 0xFF])
+            payload.extend(n & 0xFF for n in ids)
+            if node_id == constants.GROUND_STATION_ID:
+                # Ground station reports its own neighbours directly — can't DATA to itself
+                nb_str = ",".join(str(n) for n in ids)
+                print("NEIGHBOURS_REPORT node={} alive={}".format(node_id, nb_str))
+            else:
+                self.node.send_data(
+                    constants.GROUND_STATION_ID,
+                    constants.APP_CTRL,
+                    constants.CTRL_NEIGHBOURS_REPORT,
+                    bytes(payload),
+                )
+
+        elif subtype == constants.CTRL_NEIGHBOURS_REPORT:
+            if len(body) < 2:
+                print("[localise] NEIGHBOURS_REPORT: payload too short")
+                return
+            reporting_node = body[0]
+            count = body[1]
+            neighbours = list(body[2:2 + count])
+            nb_str = ",".join(str(n) for n in neighbours)
+            print("NEIGHBOURS_REPORT node={} alive={}".format(reporting_node, nb_str))
+
     # ── Periodic tick (called by node.tick()) ─────────────────────────────────
 
     def tick(self):
