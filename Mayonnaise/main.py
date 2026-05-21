@@ -109,7 +109,23 @@ def main():
     except Exception:
         allowlist = None
 
-    node = Node(node_id, allowlist=allowlist)
+    try:
+        from boot_id import load_boot_id
+        _boot_id = load_boot_id()
+    except Exception as e:
+        _boot_id = random.randint(1, 254)
+        print("boot_id fallback (no boot_id.bin):", _boot_id, e)
+
+    node = Node(node_id, boot_id=_boot_id, allowlist=allowlist)
+
+    if node_id == constants.GROUND_STATION_ID and allowlist:
+        for _nid in allowlist:
+            node.routes.set_route(_nid, _nid, 1)
+        print("GS: pre-populated routes for", sorted(allowlist))
+    else:
+        # GS is always 1 hop — pre-populate so eggs never flood RREQ for it
+        node.routes.set_route(constants.GROUND_STATION_ID, constants.GROUND_STATION_ID, 1)
+        print("pre-populated route to GS ({})".format(constants.GROUND_STATION_ID))
 
     from range_test import PingState
     _ping = PingState()
@@ -191,12 +207,16 @@ def main():
                 # 0xD2 [target_id, 0/1]                       → disable/enable beaconing, persists
                 # 0xD3 [target_id, n_packets]                 → fire n_packets pings at target (RSSI/RTT test)
                 # 0xD4 [target_id]                            → query alive neighbours (0xFF = broadcast all)
+                # 0xD5 [target_id]                            → query route table (0xFF = broadcast all)
+                # 0xD6 [target_id, 0/1]                       → disable/enable UWB (hold/release reset pin)
                 _BT_CMD_UWB             = 0xCF
                 _BT_CMD_UWB_RESTORE     = 0xD0
                 _BT_CMD_IDENTITY        = 0xD1
                 _BT_CMD_BEACON          = 0xD2
                 _BT_CMD_PING            = 0xD3
                 _BT_CMD_GET_NEIGHBOURS  = 0xD4
+                _BT_CMD_GET_ROUTES      = 0xD5
+                _BT_CMD_UWB_DISABLE     = 0xD6
                 def _bt_rx(data):
                     if not data:
                         return
@@ -250,9 +270,11 @@ def main():
                                 from identity import write_identity, read_identity
                                 existing = read_identity()
                                 cur_beacon = existing[3] if existing else True
+                                cur_uwb_en = existing[4] if existing else True
                                 write_identity(node.node_id, uwb_id_cmd,
                                                allowed_neighbors=neighbors or None,
-                                               beacon_enabled=cur_beacon)
+                                               beacon_enabled=cur_beacon,
+                                               uwb_enabled=cur_uwb_en)
                                 node.neighbours.allowlist = set(neighbors) if neighbors else None
                                 # Machine-parseable confirmation — PC script watches for this
                                 nb_str = ",".join(str(n) for n in neighbors)
@@ -273,7 +295,7 @@ def main():
                         target_id = data[1]
                         n_packets = max(1, int(data[2]))
                         print("BT CMD PING: target={} n={}".format(target_id, n_packets))
-                        _ping.start(node.node_id, target_id, n_packets)
+                        _ping.start(node, target_id, n_packets)
                     elif cmd == _BT_CMD_BEACON:
                         if len(data) < 3:
                             print("BT: beacon cmd too short:", list(data))
@@ -289,7 +311,8 @@ def main():
                                 if existing:
                                     write_identity(existing[0], existing[1],
                                                    allowed_neighbors=existing[2],
-                                                   beacon_enabled=enabled)
+                                                   beacon_enabled=enabled,
+                                                   uwb_enabled=existing[4])
                                 node.beacon_enabled = enabled
                                 print("BEACON_OK node_id={} enabled={}".format(
                                     node.node_id, int(enabled)))
@@ -308,28 +331,83 @@ def main():
                             import packets as _packets
                             seq = node.next_seq()
                             pkt = _packets.make_bcast(
-                                src=node.node_id, seq=seq, ttl=constants.MAX_TTL,
+                                src=node.node_id, seq=seq, ttl=1,
                                 app_id=constants.APP_CTRL,
                                 subtype=constants.CTRL_GET_NEIGHBOURS,
-                                data=b"",
+                                data=bytes([target_id]),
                             )
                             node.send_packet(pkt)
-                            print("GET_NEIGHBOURS broadcast sent seq={}".format(seq))
-                            # Also report egg_99's own neighbours immediately
-                            _loc = getattr(node, "localise_app", None)
-                            if _loc:
-                                try:
-                                    _loc.on_ctrl(node.node_id, constants.CTRL_GET_NEIGHBOURS, b"")
-                                except Exception as _e:
-                                    print("GET_NEIGHBOURS self-report error:", _e)
+                            print("GET_NEIGHBOURS broadcast seq={}".format(seq))
+                            node._handle_mesh_ctrl(node.node_id, constants.CTRL_GET_NEIGHBOURS,
+                                                   bytes([target_id]))
+                        elif target_id == node.node_id:
+                            node._handle_mesh_ctrl(node.node_id, constants.CTRL_GET_NEIGHBOURS,
+                                                   bytes([target_id]))
                         else:
-                            node.send_data(
-                                target_id,
-                                constants.APP_CTRL,
-                                constants.CTRL_GET_NEIGHBOURS,
-                                b"",
+                            node.send_data(target_id, constants.APP_CTRL,
+                                           constants.CTRL_GET_NEIGHBOURS, bytes([target_id]))
+                            print("GET_NEIGHBOURS sent target={}".format(target_id))
+                    elif cmd == _BT_CMD_GET_ROUTES:
+                        if len(data) < 2:
+                            print("BT: get_routes too short:", list(data))
+                            return
+                        target_id = data[1]
+                        if target_id == 0xFF:
+                            import packets as _packets
+                            seq = node.next_seq()
+                            pkt = _packets.make_bcast(
+                                src=node.node_id, seq=seq, ttl=1,
+                                app_id=constants.APP_CTRL,
+                                subtype=constants.CTRL_GET_ROUTES,
+                                data=bytes([target_id]),
                             )
-                            print("GET_NEIGHBOURS sent to egg_{}".format(target_id))
+                            node.send_packet(pkt)
+                            print("GET_ROUTES broadcast seq={}".format(seq))
+                            node._handle_mesh_ctrl(node.node_id, constants.CTRL_GET_ROUTES,
+                                                   bytes([target_id]))
+                        elif target_id == node.node_id:
+                            node._handle_mesh_ctrl(node.node_id, constants.CTRL_GET_ROUTES,
+                                                   bytes([target_id]))
+                        else:
+                            node.send_data(target_id, constants.APP_CTRL,
+                                           constants.CTRL_GET_ROUTES, bytes([target_id]))
+                            print("GET_ROUTES sent target={}".format(target_id))
+                    elif cmd == _BT_CMD_UWB_DISABLE:
+                        if len(data) < 3:
+                            print("BT: uwb_disable too short:", list(data))
+                            return
+                        target_id = data[1]
+                        enabled   = bool(data[2])
+                        print("BT CMD UWB_{}: target={}".format(
+                            "ENABLE" if enabled else "DISABLE", target_id))
+                        if target_id == node.node_id:
+                            loc = getattr(node, "localise_app", None)
+                            if loc is not None and loc.uwb is not None:
+                                try:
+                                    from identity import write_identity, read_identity
+                                    existing = read_identity()
+                                    if existing:
+                                        write_identity(existing[0], existing[1],
+                                                       allowed_neighbors=existing[2],
+                                                       beacon_enabled=existing[3],
+                                                       uwb_enabled=enabled)
+                                except Exception as e:
+                                    print("UWB_DISABLE identity write failed:", e)
+                                if enabled:
+                                    loc._uwb_enable_pending = True
+                                    print("UWB_ENABLE_PENDING node_id={}".format(node.node_id))
+                                else:
+                                    loc._uwb_enabled = False
+                                    loc.uwb.power_off()
+                                    print("UWB_OK node_id={} enabled=0".format(node.node_id))
+                            else:
+                                print("UWB_DISABLE: no UWB attached node_id={}".format(node.node_id))
+                        else:
+                            node.send_data(target_id, constants.APP_CTRL,
+                                           constants.CTRL_UWB_DISABLE,
+                                           bytes([1 if enabled else 0]))
+                            print("UWB {} relayed to egg_{}".format(
+                                "ENABLE" if enabled else "DISABLE", target_id))
                     else:
                         print("BT: unknown command:", list(data))
 
@@ -356,24 +434,56 @@ def main():
                 if loc is None:
                     print("UWB init skipped: localisation_enabled must be true to use UWB")
                 else:
-                    _attach_uwb(loc, cfg, uwb_id)
+                    try:
+                        from identity import get_uwb_enabled
+                        _uwb_en = get_uwb_enabled()
+                    except Exception:
+                        _uwb_en = True
+                    if not _uwb_en:
+                        # Disabled in identity.bin — create BU03 (fast, no configure) then
+                        # power off immediately so the 5 s AT+SETCFG sequence is skipped.
+                        try:
+                            from Drivers.uwb.bu03 import BU03
+                            p = cfg.get("uwb_pins", {})
+                            _uwb = BU03(
+                                data_uart_id   = p.get("data_uart_id",   1),
+                                data_tx        = p.get("data_tx",        17),
+                                data_rx        = p.get("data_rx",        18),
+                                config_uart_id = p.get("config_uart_id", 2),
+                                config_tx      = p.get("config_tx",      2),
+                                config_rx      = p.get("config_rx",      1),
+                                reset_pin      = p.get("reset_pin",      15),
+                            )
+                            _uwb.power_off()
+                            loc.uwb = _uwb
+                            loc.uwb_default_id = uwb_id or 0
+                            loc._uwb_enabled = False
+                            print("UWB init skipped (disabled)")
+                        except Exception as e:
+                            print("UWB disabled-boot setup failed:", e)
+                    else:
+                        _attach_uwb(loc, cfg, uwb_id)
 
         # production: no periodic hardware test in main.py (use Debug/hw_runner.py)
 
     _loc    = getattr(node, "localise_app", None)
     _radio  = getattr(node, "radio", None)
+    _uwb_attached  = _loc is not None and getattr(_loc, "uwb", None) is not None
+    _uwb_enabled   = getattr(_loc, "_uwb_enabled", True) if _loc else True
     _hw = [
-        ("radio", _radio is not None,                              cfg.get("use_hardware")),
-        ("bt",    getattr(node, "bt_logger", None) is not None,   cfg.get("use_bluetooth")),
-        ("oled",  getattr(node, "display",   None) is not None,   cfg.get("use_hardware")),
-        ("uwb",   _loc is not None and getattr(_loc, "uwb", None) is not None, cfg.get("use_uwb")),
+        ("radio", _radio is not None,                            cfg.get("use_hardware")),
+        ("bt",    getattr(node, "bt_logger", None) is not None, cfg.get("use_bluetooth")),
+        ("oled",  getattr(node, "display",   None) is not None, cfg.get("use_hardware")),
+        ("uwb",   _uwb_attached,                                 cfg.get("use_uwb")),
     ]
-    
+
     print("=" * 32)
     print("  Mayonnaise v{}  node {}".format(VERSION, node_id))
     print("  " + "-" * 28)
     for name, ok, wanted in _hw:
-        if not wanted:
+        if name == "uwb" and wanted and ok and not _uwb_enabled:
+            status = "DISABLED"
+        elif not wanted:
             status = "off"
         elif ok:
             status = "OK"
@@ -389,7 +499,9 @@ def main():
         for name, ok, wanted in _hw:
             if name == "oled":
                 continue
-            if not wanted:
+            if name == "uwb" and wanted and ok and not _uwb_enabled:
+                status = "DISABLED"
+            elif not wanted:
                 status = "off"
             elif ok:
                 status = "OK"
@@ -405,8 +517,11 @@ def main():
         except Exception:
             pass
 
-    beacon_interval = getattr(constants, "BEACON_INTERVAL", 30)
-    beacon_jitter   = getattr(constants, "BEACON_JITTER", 5)
+    beacon_interval      = getattr(constants, "BEACON_INTERVAL", 30)
+    beacon_interval_fast = getattr(constants, "BEACON_INTERVAL_FAST", 10)
+    beacon_fast_duration = getattr(constants, "BEACON_FAST_DURATION", 60)
+    beacon_jitter        = getattr(constants, "BEACON_JITTER", 5)
+    _boot_time  = time.time()
     next_beacon = time.time()
     next_tick   = time.time() + 5
 
@@ -419,13 +534,19 @@ def main():
                 next_tick = now + 5
 
             if now >= next_beacon:
+                # Use fast interval for the first beacon_fast_duration seconds after boot
+                current_interval = (
+                    beacon_interval_fast
+                    if now - _boot_time < beacon_fast_duration
+                    else beacon_interval
+                )
                 # Beacon suppression: if we transmitted anything within the last
-                # beacon_interval seconds, neighbours already know we are alive.
+                # interval seconds, neighbours already know we are alive.
                 # Skip this beacon and let the timer fire again next cycle.
-                if node.beacon_enabled and now - node._last_tx_time >= beacon_interval:
+                if node.beacon_enabled and now - node._last_tx_time >= current_interval:
                     node.send_beacon()
                 jitter = (random.random() - 0.5) * 2 * beacon_jitter
-                next_beacon = now + beacon_interval + jitter
+                next_beacon = now + current_interval + jitter
 
             _ping.poll(node)
 

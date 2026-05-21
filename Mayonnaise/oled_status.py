@@ -9,6 +9,11 @@ try:
 except Exception:
     _OLED = None
 
+try:
+    from version import VERSION as _VERSION
+except Exception:
+    _VERSION = "?"
+
 import time
 
 
@@ -83,24 +88,28 @@ class OLEDStatus:
 
     def _redraw(self):
         node_id = self.node.node_id if self.node else "-"
-        neigh_count = 0
+        neigh_ids = []
         uptime = None
         if self.node:
             try:
                 a = self.node.neighbours.get_alive()
-                neigh_count = len(a)
+                neigh_ids = sorted(e.node_id for e in a)
             except Exception:
-                neigh_count = 0
+                neigh_ids = []
             try:
                 uptime = time.time() - getattr(self.node, "start_time", self.start_time or time.time())
             except Exception:
                 uptime = None
 
+        neigh_str = ",".join(str(n) for n in neigh_ids) if neigh_ids else "-"
+
         lines = []
-        lines.append(f"ID:{node_id} T:{self.target or '-'} S:{self.success} F:{self.fail}")
-        lines.append(f"Last:{self.last_seq or '-'} {self.last_msg}")
+        lines.append("ID:{} v{}".format(node_id, _VERSION))
+        lines.append("T:{} S:{} F:{}".format(self.target or '-', self.success, self.fail))
+        lines.append("Last:{} {}".format(self.last_seq or '-', self.last_msg))
         lines.append(f"RSSI:{self.last_rssi if self.last_rssi is not None else '-'} SNR:{self.last_snr if self.last_snr is not None else '-'}")
-        lines.append(f"Nei:{neigh_count} Up:{self._format_uptime(uptime)}")
+        lines.append(f"Up:{self._format_uptime(uptime)}")
+        lines.append(f"NB:[{neigh_str}]")
 
         if self.oled:
             try:

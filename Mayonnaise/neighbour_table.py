@@ -56,6 +56,9 @@ class NeighbourTable:
         now = time.time()
         res = []
         for nid, e in list(self._entries.items()):
+            if nid == constants.GROUND_STATION_ID:
+                res.append(e)
+                continue
             age = now - e.last_seen
             if age > constants.LOST_TIMEOUT:
                 e.is_alive = False
@@ -71,6 +74,8 @@ class NeighbourTable:
         now = time.time()
         lost = []
         for nid, e in list(self._entries.items()):
+            if nid == constants.GROUND_STATION_ID:
+                continue
             if e.is_alive and (now - e.last_seen) > constants.LOST_TIMEOUT:
                 e.is_alive = False
                 lost.append(nid)
@@ -79,5 +84,7 @@ class NeighbourTable:
     def prune_stale(self):
         now = time.time()
         for nid, e in list(self._entries.items()):
+            if nid == constants.GROUND_STATION_ID:
+                continue
             if now - e.last_seen > constants.LOST_TIMEOUT:
                 del self._entries[nid]

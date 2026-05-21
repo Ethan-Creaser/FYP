@@ -63,9 +63,13 @@ _RED    = "\033[91m"
 _YELLOW = "\033[93m"
 _CYAN   = "\033[96m"
 
-_ACK_RE   = re.compile(r'\[\d+\] ACK confirmed seq=(\d+) rtt_ms=(\d+)')
-_DONE_RE  = re.compile(r'^PING_DONE')
-_START_RE = re.compile(r'^PING_START')
+_ACK_RE    = re.compile(r'\[\d+\] ACK confirmed seq=(\d+) from=(\d+).*rtt_ms=(\d+)')
+_SEND_RE   = re.compile(r'\[(\d+)\] SEND dst=(\d+) seq=(\d+).*next_hop=(\S+)')
+_DONE_RE   = re.compile(r'^PING_DONE')
+_START_RE  = re.compile(r'^PING_START')
+_WAIT_RE   = re.compile(r'^PING_WAIT')
+_ROUTE_RE  = re.compile(r'^PING_ROUTE')
+_RREP_RE    = re.compile(r'RREP: route\((\d+)\) via (\d+) hops=(\d+)')
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -120,7 +124,7 @@ class PingSession:
             m = _ACK_RE.search(line)
             if m:
                 self._acks += 1
-                self._rtts.append(int(m.group(2)))
+                self._rtts.append(int(m.group(3)))
                 if self.t_first_ack is None:
                     self.t_first_ack = now
 
@@ -146,10 +150,13 @@ class SourceEgg:
     """BLE connection to the source egg for sending pings and monitoring ACKs."""
 
     def __init__(self, client: BleakClient, node_id: int):
-        self.client   = client
-        self.node_id  = node_id
-        self._buf     = ""
-        self._session = None
+        self.client      = client
+        self.node_id     = node_id
+        self._buf        = ""
+        self._session    = None
+        self._loop       = asyncio.get_event_loop()
+        self._rrep_event = asyncio.Event()
+        self._rrep_info  = None   # (target, next_hop, hops) once RREP arrives
 
     async def _setup(self):
         await self.client.start_notify(NUS_TX_UUID, self._notify)
@@ -165,6 +172,22 @@ class SourceEgg:
         )
         return s
 
+    async def probe_route(self, target: int, timeout: float = 30.0) -> bool:
+        """Send a single ping to target — triggers RREQ if no route exists.
+        Waits for PING_ROUTE (route receipt) and returns True if confirmed."""
+        self._rrep_event.clear()
+        self._rrep_info = None
+        await self.client.write_gatt_char(
+            NUS_RX_UUID,
+            bytes([CMD_PING, target & 0xFF, 1]),
+            response=True,
+        )
+        try:
+            await asyncio.wait_for(self._rrep_event.wait(), timeout=timeout)
+            return True
+        except asyncio.TimeoutError:
+            return False
+
     def _notify(self, _, data: bytearray):
         try:
             self._buf += data.decode("utf-8", errors="replace")
@@ -177,9 +200,31 @@ class SourceEgg:
             if not line:
                 continue
             if _START_RE.match(line) or _DONE_RE.match(line):
-                print(f"  [egg_{self.node_id}] {line}")
+                print(f"  [egg_{self.node_id}] {_GREEN}{line}{_RESET}")
+                if _START_RE.match(line):
+                    # PING_START always means route is confirmed — covers both the
+                    # pre-cached case (no PING_ROUTE) and the RREQ→RREP path.
+                    self._loop.call_soon_threadsafe(self._rrep_event.set)
+            elif _WAIT_RE.match(line) or _ROUTE_RE.match(line):
+                print(f"  [egg_{self.node_id}] {_YELLOW}{line}{_RESET}")
+                if _ROUTE_RE.match(line):
+                    parts = dict(p.split("=") for p in line.split()[1:] if "=" in p)
+                    tgt = int(parts.get("target", 0))
+                    nh  = int(parts.get("next_hop", 0))
+                    self._rrep_info = (tgt, nh, None)
+            elif _SEND_RE.search(line):
+                m = _SEND_RE.search(line)
+                nh = m.group(4)
+                stale = (hasattr(self, "killed_egg") and
+                         self.killed_egg is not None and
+                         nh == str(self.killed_egg))
+                tag = f" {_RED}(stale — egg_{nh} killed){_RESET}" if stale else ""
+                print(f"  [egg_{self.node_id}] {_CYAN}→ SEND seq={m.group(3)} "
+                      f"dst=egg_{m.group(2)} via egg_{nh}{_RESET}{tag}")
             elif _ACK_RE.search(line):
-                print(f"  [egg_{self.node_id}] {line}")
+                m = _ACK_RE.search(line)
+                print(f"  [egg_{self.node_id}] {_GREEN}← ACK  seq={m.group(1)} "
+                      f"from=egg_{m.group(2)} rtt_ms={m.group(3)}{_RESET}")
             if self._session:
                 self._session.on_line(line, now)
 
@@ -217,6 +262,30 @@ async def phase_setup(topo: Topology, timeout: float):
     return ft, ok
 
 
+# ── Route check + confirmation ────────────────────────────────────────────────
+
+async def _confirm_route(src: "SourceEgg", dst: int):
+    """Probe route from src to dst via RREQ.  Retries on failure.
+    Asks user to confirm before PDR test starts."""
+    while True:
+        print(f"\n  {_BOLD}Route check  egg_{src.node_id} → egg_{dst}{_RESET}")
+        print(f"  Sending RREQ to egg_{dst}...")
+        ok = await src.probe_route(dst, timeout=30.0)
+        if ok:
+            info = src._rrep_info
+            if info:
+                print(f"  {_GREEN}Route confirmed: egg_{src.node_id} → "
+                      f"egg_{info[1]} → … → egg_{dst}{_RESET}")
+            ans = await _ask("  Start PDR test? [Enter to confirm / n to retry]: ")
+            if ans.strip().lower() != "n":
+                return
+        else:
+            print(f"  {_RED}No route reply from egg_{dst} within 30s{_RESET}")
+            ans = await _ask("  Try again? [Enter to retry / n to skip]: ")
+            if ans.strip().lower() == "n":
+                return
+
+
 # ── Phase 2: PDR Baseline ─────────────────────────────────────────────────────
 
 async def phase_baseline(src: SourceEgg, dst: int, n: int) -> float:
@@ -225,6 +294,7 @@ async def phase_baseline(src: SourceEgg, dst: int, n: int) -> float:
     print(f"{_BOLD}  PHASE 2 — PDR Baseline  "
           f"egg_{src.node_id} → egg_{dst}{_RESET}")
     print(f"{_BOLD}{'═'*62}{_RESET}")
+    await _confirm_route(src, dst)
     print(f"  Sending {n} pings...")
 
     s = await src.send_ping(dst, n)
@@ -239,16 +309,17 @@ async def phase_baseline(src: SourceEgg, dst: int, n: int) -> float:
 
 # ── Phase 3: One Rerouting Trial ──────────────────────────────────────────────
 
-async def phase_trial(src: SourceEgg, dst: int, via: int,
+async def phase_trial(src: SourceEgg, dst: int,
                       n: int, trial: int) -> dict:
     """Run one kill-B / reroute / restore-B trial.  Returns metrics dict."""
+    via = 0   # set interactively at kill step
     print(f"\n{_BOLD}{'─'*62}{_RESET}")
-    print(f"{_BOLD}  TRIAL {trial}  —  kill egg_{via}  "
-          f"(egg_{src.node_id} → egg_{dst}){_RESET}")
+    print(f"{_BOLD}  TRIAL {trial}  —  egg_{src.node_id} → egg_{dst}{_RESET}")
     print(f"{_BOLD}{'─'*62}{_RESET}")
     tout = n * 20 + 60   # generous timeout: rerouting can take 15-30 s per ping
 
     # ── Pre-kill baseline ──────────────────────────────────────────────────────
+    await _confirm_route(src, dst)
     print(f"  [pre-kill]   Sending {n} pings via nominal route...")
     s_pre = await src.send_ping(dst, n)
     if not await s_pre.wait(timeout=tout):
@@ -257,11 +328,17 @@ async def phase_trial(src: SourceEgg, dst: int, via: int,
           f"({s_pre._acks}/{n})")
 
     # ── Kill B ────────────────────────────────────────────────────────────────
-    print(f"\n  {_YELLOW}[ ACTION ]  Power off egg_{via}.{_RESET}")
+    raw = await _ask(f"\n  {_YELLOW}[ ACTION ]  Which egg to power off? "
+                     f"Enter egg ID: {_RESET}")
+    via = int(raw.strip()) if raw.strip().isdigit() else via
+    print(f"  {_YELLOW}Powering off egg_{via}...{_RESET}")
     await _ask(f"  Press Enter once egg_{via} is off: ")
     t_kill = _time.monotonic()
+    src.killed_egg = via
 
     # ── Transition batch (captures rerouting) ─────────────────────────────────
+    print(f"\n  {_YELLOW}Note: cached route may still show egg_{via} until ACK "
+          f"failures trigger RREQ — this is expected.{_RESET}")
     print(f"\n  [transition] Sending {n} pings — rerouting in progress...")
     s_tr = await src.send_ping(dst, n)
     if not await s_tr.wait(timeout=tout):
@@ -275,6 +352,7 @@ async def phase_trial(src: SourceEgg, dst: int, via: int,
           f"reroute time: {rt_str}")
 
     # ── Post-reroute batch ────────────────────────────────────────────────────
+    src.killed_egg = None
     print(f"\n  [post-route] Sending {n} pings — alternate route established...")
     s_post = await src.send_ping(dst, n)
     if not await s_post.wait(timeout=tout):
@@ -428,10 +506,6 @@ async def _run(args):
     if len(paths) < 2:
         print(f"{_RED}Warning: fewer than 2 distinct paths declared — "
               f"multi-path test cannot be verified from topology file.{_RESET}")
-    if not any(args.via in p[1:-1] for p in paths):
-        print(f"{_YELLOW}Warning: egg_{args.via} is not an intermediate node "
-              f"on any declared path — killing it may not test rerouting.{_RESET}")
-
     ft, ft_ok = await phase_setup(topo, args.formation_timeout)
 
     async with SourceEgg.connect(args.source) as src:
@@ -439,7 +513,7 @@ async def _run(args):
 
         trials = []
         for i in range(1, args.trials + 1):
-            r = await phase_trial(src, args.dest, args.via, args.pings, i)
+            r = await phase_trial(src, args.dest, args.pings, i)
             trials.append(r)
             if i < args.trials:
                 await _ask(f"\n  Ready for trial {i + 1} — press Enter: ")
@@ -460,9 +534,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python test_1a_mesh_check.py topology.json --source 1 --dest 3 --via 2
-  python test_1a_mesh_check.py topology.json \\
-      --source 1 --dest 3 --via 2 --trials 5 --pings 20
+  python test_1a_mesh_check.py topology.json --source 1 --dest 3
+  python test_1a_mesh_check.py topology.json --source 1 --dest 3 --trials 5 --pings 20
         """,
     )
     ap.add_argument("topology", help="Topology JSON file")
@@ -470,8 +543,6 @@ Examples:
                     help="Source node (A)")
     ap.add_argument("--dest",   type=int, required=True, metavar="ID",
                     help="Destination node (C)")
-    ap.add_argument("--via",    type=int, required=True, metavar="ID",
-                    help="Intermediate node to kill (B)")
     ap.add_argument("--trials", type=int, default=5,
                     help="Rerouting trials (default 5)")
     ap.add_argument("--pings",  type=int, default=10,
@@ -482,8 +553,6 @@ Examples:
 
     if args.source == args.dest:
         ap.error("--source and --dest must be different nodes")
-    if args.via in (args.source, args.dest):
-        ap.error("--via must be different from --source and --dest")
 
     asyncio.run(_run(args))
 

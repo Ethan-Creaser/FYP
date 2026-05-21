@@ -1,18 +1,20 @@
 """Identity helper: read/write a small identity.bin file used to set node IDs.
 
-Format (v3): MAGIC (0xE9), node_id, uwb_id, neighbor_count, [n0, n1, ...], beacon_enabled
+Format (v4): MAGIC (0xE9), node_id, uwb_id, neighbor_count, [n0, n1, ...], beacon_enabled, uwb_enabled
   neighbor_count = 0  → no restriction (accept all neighbors)
   neighbor_count > 0  → allowlist of that many node IDs follows
   beacon_enabled      → 1 (default) or 0; absent in older files → treated as 1
+  uwb_enabled         → 1 (default) or 0; absent in older files → treated as 1
 
-Old v2 format (no beacon_enabled byte) is read as beacon_enabled=True.
+Old v3 format (no uwb_enabled byte) is read as uwb_enabled=True.
+Old v2 format (no beacon_enabled byte) is read as beacon_enabled=True, uwb_enabled=True.
 Old 3-byte format (no neighbor_count byte) is read as "no restriction".
 
 Usage:
-  from identity import get_ids, get_allowed_neighbors, get_beacon_enabled, write_identity
+  from identity import get_ids, get_allowed_neighbors, get_beacon_enabled, get_uwb_enabled, write_identity
   node_id, uwb_id = get_ids()
   allowlist = get_allowed_neighbors()    # set or None (identity.bin only)
-  write_identity(3, uwb_id=3, allowed_neighbors=[2, 4], beacon_enabled=True)
+  write_identity(3, uwb_id=3, allowed_neighbors=[2, 4], beacon_enabled=True, uwb_enabled=True)
 """
 
 MAGIC = 0xE9
@@ -22,11 +24,12 @@ DEFAULT_FILE = "identity.bin"
 UWB_NONE = 0xFF   # sentinel stored in identity.bin meaning "no UWB attached"
 
 
-def write_identity(node_id, uwb_id=None, allowed_neighbors=None, beacon_enabled=True, path=None):
+def write_identity(node_id, uwb_id=None, allowed_neighbors=None, beacon_enabled=True, uwb_enabled=True, path=None):
     """Write identity file.
 
     allowed_neighbors: list/iterable of node IDs, or None/[] for no restriction.
     beacon_enabled: True (default) or False — persists across reboots.
+    uwb_enabled: True (default) or False — holds UWB reset pin low on boot if False.
     uwb_id=None writes UWB_NONE (0xFF) — main.py will skip UWB initialisation.
     """
     stored_uwb = UWB_NONE if uwb_id is None else (int(uwb_id) & 0xFF)
@@ -39,15 +42,17 @@ def write_identity(node_id, uwb_id=None, allowed_neighbors=None, beacon_enabled=
     else:
         buf.append(0)
     buf.append(1 if beacon_enabled else 0)
+    buf.append(1 if uwb_enabled else 0)
     with open(fn, "wb") as f:
         f.write(bytes(buf))
 
 
 def read_identity(path=None):
-    """Return (node_id, uwb_id, allowed_neighbors_or_None, beacon_enabled) or None if missing/invalid.
+    """Return (node_id, uwb_id, allowed_neighbors_or_None, beacon_enabled, uwb_enabled) or None if missing/invalid.
 
     allowed_neighbors is a set of ints, or None if no restriction is stored.
     beacon_enabled defaults to True for files written before v3.
+    uwb_enabled defaults to True for files written before v4.
     """
     fn = path or DEFAULT_FILE
     try:
@@ -71,7 +76,11 @@ def read_identity(path=None):
     beacon_byte_idx = 4 + count
     if len(data) > beacon_byte_idx:
         beacon_enabled = bool(data[beacon_byte_idx])
-    return (node_id, uwb_id, neighbors, beacon_enabled)
+    uwb_enabled = True
+    uwb_byte_idx = beacon_byte_idx + 1
+    if len(data) > uwb_byte_idx:
+        uwb_enabled = bool(data[uwb_byte_idx])
+    return (node_id, uwb_id, neighbors, beacon_enabled, uwb_enabled)
 
 
 def get_ids(cfg_path="config.json"):
@@ -103,4 +112,12 @@ def get_beacon_enabled():
     ids = read_identity()
     if ids is not None:
         return ids[3]
+    return True
+
+
+def get_uwb_enabled():
+    """Return uwb_enabled from identity.bin, or True if not set."""
+    ids = read_identity()
+    if ids is not None:
+        return ids[4]
     return True

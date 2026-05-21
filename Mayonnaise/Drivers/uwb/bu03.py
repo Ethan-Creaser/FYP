@@ -84,6 +84,18 @@ class BU03:
     def reconfigure(self, node_id, role, channel=1, rate=1):
         self.configure(node_id, role, channel=channel, rate=rate, warm=False)
 
+    def power_off(self):
+        """Hold reset pin low — stops UWB chip, saves ~40 mA. Fast, non-blocking."""
+        self.reset_pin.value(0)
+        self._buffer = bytearray()
+
+    def power_on(self):
+        """Release reset pin and wait for cold boot. Blocks ~4 s."""
+        self.reset_pin.value(1)
+        utime.sleep_ms(BOOT_WAIT_COLD_MS)
+        self._init_uarts()
+        self._buffer = bytearray()
+
     def flush(self):
         if self.data_uart.any():
             self.data_uart.read()

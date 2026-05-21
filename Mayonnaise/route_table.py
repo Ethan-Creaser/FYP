@@ -30,14 +30,12 @@ class RouteTable:
         e = self._routes.get(dest)
         if not e:
             return None
-        # expire after DEFAULT_ROUTE_TTL_MS
-        if (time.time() - e.last_used) * 1000 > constants.DEFAULT_ROUTE_TTL_MS:
-            del self._routes[dest]
-            return None
         e.touch()
         return e.next_hop
 
     def penalize(self, dest: int):
+        if dest == constants.GROUND_STATION_ID:
+            return
         e = self._routes.get(dest)
         if not e:
             return
@@ -45,8 +43,11 @@ class RouteTable:
         if e.failures >= 3:
             del self._routes[dest]
 
+    def all_routes(self):
+        """Return list of (dst, next_hop, hops) for every known route."""
+        return [(e.dest, e.next_hop, e.hops) for e in self._routes.values()]
+
     def invalidate_next_hop(self, next_hop: int):
-        # remove any routes that use this next_hop
         for d, e in list(self._routes.items()):
-            if e.next_hop == next_hop:
+            if e.next_hop == next_hop and e.dest != constants.GROUND_STATION_ID:
                 del self._routes[d]

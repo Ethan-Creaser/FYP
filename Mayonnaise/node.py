@@ -24,8 +24,9 @@ _MAX_PENDING_PER_DST = 3   # max DATA packets buffered per destination while wai
 
 
 class Node:
-    def __init__(self, node_id, allowlist=None):
+    def __init__(self, node_id, boot_id=0, allowlist=None):
         self.node_id    = node_id
+        self.boot_id    = boot_id
         self.neighbours = NeighbourTable(allowlist=allowlist)
         self.routes     = RouteTable()
         self.network       = None     # set by SimNetwork.register_node
@@ -36,6 +37,15 @@ class Node:
         self.localise_app  = None     # set by LocaliseApp.__init__
         self.beacon_enabled = True    # overridden from identity.bin at boot; toggled by CTRL_BEACON
         self.start_time    = time.time()
+
+        # Permanent direct route to the ground station — seeded at boot,
+        # never evicted (RouteTable guards it in penalize/invalidate_next_hop).
+        if self.node_id != constants.GROUND_STATION_ID:
+            self.routes.set_route(
+                constants.GROUND_STATION_ID,
+                constants.GROUND_STATION_ID,
+                1,
+            )
 
         self._seq       = 1
         self._last_tx_time = 0        # updated on every send; used for beacon suppression
@@ -78,6 +88,8 @@ class Node:
         all nearby nodes refresh their neighbour-table entries on every TX.
         """
         pkt.sender_id = self.node_id
+        if pkt.src == self.node_id:
+            pkt.boot_id = self.boot_id
         self._last_tx_time = time.time()
         led = getattr(self, "led", None)
         if led:
@@ -110,6 +122,8 @@ class Node:
         If a cached route exists the packet goes immediately.
         Otherwise it is buffered and a RREQ flood is triggered.
         """
+        if self.node_id == constants.GROUND_STATION_ID:
+            ttl = 1
         seq = self.next_seq()
         pkt = packets.make_data(
             src=self.node_id, dst=dst, seq=seq, ttl=ttl,
@@ -122,6 +136,7 @@ class Node:
             self.node_id, dst, seq, app_id, subtype, next_hop))
 
         if next_hop is not None:
+            pkt.relay_id = next_hop
             self.send_packet(pkt)
         else:
             buf = self._pending_data.setdefault(dst, [])
@@ -132,6 +147,15 @@ class Node:
 
     def _flood_rreq(self, target_id):
         """Send a RREQ for target_id unless one is already in flight."""
+        if self.node_id == constants.GROUND_STATION_ID:
+            print("[{}] GS: no route to {} — dropping (never floods RREQ)".format(
+                self.node_id, target_id))
+            # Clean up any buffered data for this destination
+            self._pending_data.pop(target_id, None)
+            for key in [k for k in self.outstanding if k[0] == self.node_id]:
+                if self.outstanding[key][2] == target_id:
+                    del self.outstanding[key]
+            return
         if target_id in self._rreq_pending:
             return
         seq = self.next_seq()
@@ -166,6 +190,10 @@ class Node:
         # Every received packet refreshes the sender's neighbour entry.
         self.neighbours.update(from_id, rssi=rssi, snr=snr)
 
+        # GS passively learns direct routes to every node it overhears.
+        if self.node_id == constants.GROUND_STATION_ID:
+            self.routes.set_route(from_id, from_id, 1)
+
         # Update OLED/display if attached
         disp = getattr(self, "display", None)
         if disp:
@@ -184,20 +212,13 @@ class Node:
         self.handle_packet(pkt, from_id)
 
     def _seen_check(self, pkt):
-        """Return True if (src, seq) was seen recently (duplicate). Record if new."""
-        key = (pkt.src, pkt.seq)
-        now = time.time()
+        """Return True if (src, boot_id, seq) was already seen (duplicate). Record if new."""
+        key = (pkt.src, pkt.boot_id, pkt.seq)
         if key in self._seen:
-            age = now - self._seen[key]
-            if age < constants.SEEN_TTL:
-                print("[{}] DROP dup src={} seq={} age={:.1f}s".format(
-                    self.node_id, pkt.src, pkt.seq, age))
-                return True
-            # Entry expired — treat as unseen (handles seq reuse after remote reboot)
-            print("[{}] SEEN expired src={} seq={} age={:.1f}s — accepting".format(
-                self.node_id, pkt.src, pkt.seq, age))
-            del self._seen[key]
-        self._seen[key] = now
+            print("[{}] DROP dup src={} boot_id={} seq={}".format(
+                self.node_id, pkt.src, pkt.boot_id, pkt.seq))
+            return True
+        self._seen[key] = time.time()
         # Prune oldest half when cache gets large (MicroPython-safe: no heapq)
         if len(self._seen) > 256:
             items = sorted(self._seen.items(), key=lambda x: x[1])
@@ -231,9 +252,11 @@ class Node:
                     )
                     self.send_packet(ack)
                 elif (pkt.src, pkt.seq) in self.pending_forwards:
-                    # We relayed this but the next hop hasn't ACKed yet — re-forward
-                    # so the next hop gets another chance if it missed the first TX.
-                    self._handle_data(pkt, from_id)
+                    # Re-forward only if the same upstream node is retrying.
+                    # A different node sending the same (src, seq) is a parallel
+                    # duplicate — ignore it so we don't corrupt the ACK chain.
+                    if from_id == self.pending_forwards[(pkt.src, pkt.seq)][0]:
+                        self._handle_data(pkt, from_id)
                 return
             self._handle_data(pkt, from_id)
             return
@@ -274,6 +297,11 @@ class Node:
             )
             self.send_packet(ack)
 
+            # Reverse route learning: cache route back to originator so any
+            # reply can unicast immediately without an RREQ flood.
+            hop_count = 1 if from_id == pkt.src else max(1, constants.MAX_TTL - pkt.ttl + 1)
+            self.routes.set_route(pkt.src, from_id, hop_count)
+
             # Parse app layer
             try:
                 app_id, subtype, body = packets.parse_app_payload(pkt.payload)
@@ -287,6 +315,13 @@ class Node:
             return
 
         # Not for me — forward
+        if self.node_id == constants.GROUND_STATION_ID:
+            return  # GS doesn't relay — stays invisible to mesh routing
+
+        # relay_id guard: drop if the previous hop designated someone else as next relay
+        if pkt.relay_id != constants.BROADCAST_ID and pkt.relay_id != self.node_id:
+            return
+
         if pkt.ttl <= 1:
             print("[{}] DROP src={} seq={} ttl expired".format(
                 self.node_id, pkt.src, pkt.seq))
@@ -295,12 +330,21 @@ class Node:
             print("[{}] DROP src={} seq={} dst={} not in allowlist".format(
                 self.node_id, pkt.src, pkt.seq, pkt.dst))
             return
+
+        # Look up our next hop toward dst — drop if we have no route
+        fwd_next_hop = self.routes.get_next_hop(pkt.dst)
+        if fwd_next_hop is None:
+            print("[{}] DROP src={} seq={} no route to {}".format(
+                self.node_id, pkt.src, pkt.seq, pkt.dst))
+            return
+
         pkt.ttl -= 1
 
         # Record prev_hop so we can relay the ACK back when it arrives
         self.pending_forwards[(pkt.src, pkt.seq)] = [from_id, time.time()]
 
-        # If a RREP is passing through, opportunistically cache the forward route
+        # Cache the forward route for a passing RREP — only runs when we are
+        # the designated relay, so bystanders never acquire spurious routes.
         if len(pkt.payload) >= 6:
             try:
                 app_id = pkt.payload[0]
@@ -311,12 +355,15 @@ class Node:
             except Exception:
                 pass
 
+        # Stamp our chosen next hop so only the intended relay forwards further
+        pkt.relay_id = fwd_next_hop
+
         try:
             fwd_app, fwd_sub = pkt.payload[0], pkt.payload[1]
         except Exception:
             fwd_app, fwd_sub = "?", "?"
-        print("[{}] FWD DATA src={} dst={} seq={} app={} sub={} ttl={}".format(
-            self.node_id, pkt.src, pkt.dst, pkt.seq, fwd_app, fwd_sub, pkt.ttl))
+        print("[{}] FWD DATA src={} dst={} seq={} app={} sub={} ttl={} relay={}".format(
+            self.node_id, pkt.src, pkt.dst, pkt.seq, fwd_app, fwd_sub, pkt.ttl, fwd_next_hop))
         self.send_packet(pkt)
 
     def _deliver_to_app(self, pkt, app_id, subtype, body):
@@ -334,10 +381,11 @@ class Node:
                 print("[{}] localise on_rx error: {}".format(self.node_id, e))
 
         elif app_id == constants.APP_CTRL:
-            try:
-                loc.on_ctrl(pkt.src, subtype, body)
-            except Exception as e:
-                print("[{}] localise on_ctrl error: {}".format(self.node_id, e))
+            if not self._handle_mesh_ctrl(pkt.src, subtype, body):
+                try:
+                    loc.on_ctrl(pkt.src, subtype, body)
+                except Exception as e:
+                    print("[{}] localise on_ctrl error: {}".format(self.node_id, e))
 
     # ── BCAST ─────────────────────────────────────────────────────────────────
 
@@ -348,6 +396,8 @@ class Node:
             app_id, subtype, body = None, None, pkt.payload
 
         if app_id == constants.APP_ROUTING:
+            if self.node_id == constants.GROUND_STATION_ID:
+                return  # GS doesn't participate in mesh routing floods
             self._handle_routing_bcast(subtype, body, from_id, pkt)
         else:
             # Opportunistically cache a reverse route to the BCAST originator so
@@ -364,12 +414,87 @@ class Node:
     def _deliver_bcast_to_app(self, pkt, app_id, subtype, body):
         print("[{}] BCAST src={} app={} sub={} len={}".format(
             self.node_id, pkt.src, app_id, subtype, len(body)))
-        loc = getattr(self, "localise_app", None)
-        if loc and app_id == constants.APP_CTRL:
-            try:
-                loc.on_ctrl(pkt.src, subtype, body)
-            except Exception as e:
-                print("[{}] localise bcast ctrl error: {}".format(self.node_id, e))
+        if app_id == constants.APP_CTRL:
+            if self._handle_mesh_ctrl(pkt.src, subtype, body):
+                return
+            loc = getattr(self, "localise_app", None)
+            if loc:
+                try:
+                    loc.on_ctrl(pkt.src, subtype, body)
+                except Exception as e:
+                    print("[{}] localise bcast ctrl error: {}".format(self.node_id, e))
+
+    # ── Mesh diagnostics (APP_CTRL) ───────────────────────────────────────────
+
+    def _handle_mesh_ctrl(self, src_id, subtype, body):
+        """Handle APP_CTRL subtypes that query mesh state (neighbours, routes).
+
+        Returns True if the subtype was handled here so callers can skip
+        forwarding to localise_app.  Returns False for unrecognised subtypes.
+        """
+        if subtype == constants.CTRL_GET_NEIGHBOURS:
+            target  = body[0] if body else constants.BROADCAST_ID
+            node_id = self.node_id
+            if target != constants.BROADCAST_ID and target != node_id:
+                return True  # not addressed to this egg
+            alive   = self.neighbours.get_alive()
+            ids     = [e.node_id for e in alive]
+            print("[{}] GET_NEIGHBOURS: alive={}".format(node_id, ids))
+            payload = bytearray([node_id & 0xFF, len(ids) & 0xFF])
+            payload.extend(n & 0xFF for n in ids)
+            if node_id == constants.GROUND_STATION_ID:
+                nb_str = ",".join(str(n) for n in ids)
+                print("NEIGHBOURS_REPORT node={} alive={}".format(node_id, nb_str))
+            else:
+                self.send_data(src_id, constants.APP_CTRL,
+                               constants.CTRL_NEIGHBOURS_REPORT, bytes(payload))
+            return True
+
+        if subtype == constants.CTRL_NEIGHBOURS_REPORT:
+            if len(body) < 2:
+                return True
+            reporting_node = body[0]
+            count          = body[1]
+            neighbours     = list(body[2:2 + count])
+            nb_str = ",".join(str(n) for n in neighbours)
+            print("NEIGHBOURS_REPORT node={} alive={}".format(reporting_node, nb_str))
+            return True
+
+        if subtype == constants.CTRL_GET_ROUTES:
+            target  = body[0] if body else constants.BROADCAST_ID
+            node_id = self.node_id
+            if target != constants.BROADCAST_ID and target != node_id:
+                return True  # not addressed to this egg
+            routes  = self.routes.all_routes()
+            print("[{}] GET_ROUTES: count={}".format(node_id, len(routes)))
+            payload = bytearray([node_id & 0xFF, len(routes) & 0xFF])
+            for dst, next_hop, _hops in routes:
+                payload.append(dst & 0xFF)
+                payload.append(next_hop & 0xFF)
+            if node_id == constants.GROUND_STATION_ID:
+                pairs = " ".join("{}->{}".format(d, nh) for d, nh, _ in routes)
+                print("ROUTES_REPORT node={} routes={}".format(node_id, pairs))
+            else:
+                self.send_data(src_id, constants.APP_CTRL,
+                               constants.CTRL_ROUTES_REPORT, bytes(payload))
+            return True
+
+        if subtype == constants.CTRL_ROUTES_REPORT:
+            if len(body) < 2:
+                return True
+            reporting_node = body[0]
+            count          = body[1]
+            pairs = []
+            for i in range(count):
+                off = 2 + i * 2
+                if off + 1 >= len(body):
+                    break
+                pairs.append((body[off], body[off + 1]))
+            route_str = " ".join("{}->{}".format(d, nh) for d, nh in pairs)
+            print("ROUTES_REPORT node={} routes={}".format(reporting_node, route_str))
+            return True
+
+        return False
 
     # ── Routing ───────────────────────────────────────────────────────────────
 
@@ -390,7 +515,8 @@ class Node:
                 self.node_id, origin_id, target_id, hop_count))
 
             if target_id == self.node_id:
-                self._send_rrep(origin_id, origin_seq, hop_count + 1)
+                if self.node_id != constants.GROUND_STATION_ID:
+                    self._send_rrep(origin_id, origin_seq, hop_count + 1)
             else:
                 # Update hop_count in payload before the BCAST handler rebroadcasts
                 if pkt.ttl > 1:
@@ -413,7 +539,11 @@ class Node:
             origin_seq=origin_seq,
             hop_count=hop_count,
         )
-        print("[{}] RREP -> origin={} hops={}".format(self.node_id, origin_id, hop_count))
+        next_hop = self.routes.get_next_hop(origin_id)
+        if next_hop is not None:
+            pkt.relay_id = next_hop
+        print("[{}] RREP -> origin={} hops={} relay={}".format(
+            self.node_id, origin_id, hop_count, pkt.relay_id))
         self.send_packet(pkt)
 
     def _handle_routing_data(self, subtype, body, from_id):
@@ -433,9 +563,12 @@ class Node:
 
             # Send any DATA packets that were buffered waiting for this route
             pending = self._pending_data.pop(target_id, [])
+            next_hop = self.routes.get_next_hop(target_id)
             for p in pending:
-                print("[{}] flush pending DATA dst={} seq={}".format(
-                    self.node_id, target_id, p.seq))
+                if next_hop is not None:
+                    p.relay_id = next_hop
+                print("[{}] flush pending DATA dst={} seq={} relay={}".format(
+                    self.node_id, target_id, p.seq, p.relay_id))
                 self.send_packet(p)
 
     # ── ACK ───────────────────────────────────────────────────────────────────

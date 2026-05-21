@@ -50,9 +50,11 @@ class LocaliseApp:
         self.node = node
         node.localise_app = self   # registers with node so mesh calls on_rx/on_ctrl/tick
 
-        self.uwb           = None   # set by main.py after construction if use_uwb
-        self._uwb_pending  = None   # (uwb_id, role, src) or None — executed by tick()
-        self._last_scan_dst = None  # destination of the most recent scan send
+        self.uwb              = None   # set by main.py after construction if use_uwb
+        self._uwb_pending     = None   # (uwb_id, role, src) or None — executed by tick()
+        self._last_scan_dst   = None   # destination of the most recent scan send
+        self._uwb_enabled     = True   # False while reset pin is held low
+        self._uwb_enable_pending = False  # deferred power_on() — executed by tick()
 
     # ── Mesh send helper ──────────────────────────────────────────────────────
 
@@ -158,6 +160,32 @@ class LocaliseApp:
             print("IDENTITY_OK node_id={} uwb_id={} neighbors={}".format(
                 ack_node_id, ack_uwb_id, nb_str))
 
+        elif subtype == constants.CTRL_UWB_DISABLE:
+            if len(body) < 1:
+                print("[localise] CTRL_UWB_DISABLE: payload too short")
+                return
+            enabled = bool(body[0])
+            node_id = self.node.node_id
+            if self.uwb is None:
+                print("[localise] UWB_DISABLE: no UWB attached")
+                return
+            try:
+                from identity import write_identity, read_identity
+                existing = read_identity()
+                if existing:
+                    write_identity(existing[0], existing[1],
+                                   allowed_neighbors=existing[2],
+                                   beacon_enabled=existing[3],
+                                   uwb_enabled=enabled)
+            except Exception as e:
+                print("[localise] UWB_DISABLE identity write failed:", e)
+            if enabled:
+                self._uwb_enable_pending = True
+                print("UWB_ENABLE_PENDING node_id={}".format(node_id))
+            else:
+                self._uwb_enabled = False
+                self.uwb.power_off()
+                print("UWB_OK node_id={} enabled=0".format(node_id))
         elif subtype == constants.CTRL_BEACON:
             if len(body) < 1:
                 print("[localise] CTRL_BEACON: payload too short")
@@ -172,7 +200,8 @@ class LocaliseApp:
                 if existing:
                     write_identity(existing[0], existing[1],
                                    allowed_neighbors=existing[2],
-                                   beacon_enabled=enabled)
+                                   beacon_enabled=enabled,
+                                   uwb_enabled=existing[4])
                 self.node.beacon_enabled = enabled
                 print("BEACON_OK node_id={} enabled={}".format(node_id, int(enabled)))
                 ack = bytes([node_id & 0xFF, 1 if enabled else 0])
@@ -180,35 +209,6 @@ class LocaliseApp:
                                     constants.CTRL_IDENTITY_ACK, ack)
             except Exception as e:
                 print("[localise] BEACON_FAIL reason={}".format(e))
-
-        elif subtype == constants.CTRL_GET_NEIGHBOURS:
-            alive = self.node.neighbours.get_alive()
-            ids = [e.node_id for e in alive]
-            node_id = self.node.node_id
-            print("[localise] GET_NEIGHBOURS: node_id={} alive={}".format(node_id, ids))
-            payload = bytearray([node_id & 0xFF, len(ids) & 0xFF])
-            payload.extend(n & 0xFF for n in ids)
-            if node_id == constants.GROUND_STATION_ID:
-                # Ground station reports its own neighbours directly — can't DATA to itself
-                nb_str = ",".join(str(n) for n in ids)
-                print("NEIGHBOURS_REPORT node={} alive={}".format(node_id, nb_str))
-            else:
-                self.node.send_data(
-                    constants.GROUND_STATION_ID,
-                    constants.APP_CTRL,
-                    constants.CTRL_NEIGHBOURS_REPORT,
-                    bytes(payload),
-                )
-
-        elif subtype == constants.CTRL_NEIGHBOURS_REPORT:
-            if len(body) < 2:
-                print("[localise] NEIGHBOURS_REPORT: payload too short")
-                return
-            reporting_node = body[0]
-            count = body[1]
-            neighbours = list(body[2:2 + count])
-            nb_str = ",".join(str(n) for n in neighbours)
-            print("NEIGHBOURS_REPORT node={} alive={}".format(reporting_node, nb_str))
 
     # ── Periodic tick (called by node.tick()) ─────────────────────────────────
 
@@ -218,6 +218,16 @@ class LocaliseApp:
         Called by node.tick() every ~5 s.  UWB configure_warm() blocks for
         several seconds and must not run inside the radio IRQ/callback stack.
         """
+        if self._uwb_enable_pending and self.uwb is not None:
+            self._uwb_enable_pending = False
+            try:
+                self.uwb.power_on()
+                self._uwb_enabled = True
+                print("UWB_OK node_id={} enabled=1".format(self.node.node_id))
+            except Exception as e:
+                print("[localise] UWB power_on failed:", e)
+            return
+
         if self._uwb_pending is None:
             return
 

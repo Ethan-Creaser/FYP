@@ -1,8 +1,10 @@
 """Core constants for the mesh network."""
 
 # Timing (seconds)
-BEACON_INTERVAL = 30
-BEACON_JITTER   = 5
+BEACON_INTERVAL      = 30
+BEACON_INTERVAL_FAST = 10   # beacon rate for the first BEACON_FAST_DURATION seconds after boot
+BEACON_FAST_DURATION = 60   # seconds to use fast beacon rate after boot
+BEACON_JITTER        = 5
 SUSPECT_TIMEOUT = 90
 LOST_TIMEOUT    = 150
 
@@ -13,7 +15,6 @@ HOP_ACK_TIMEOUT      = 5         # seconds before retrying an unACKed hop
 MAX_HOP_RETRIES      = 3
 RREQ_TIMEOUT         = 3         # seconds to wait for RREP before retrying
 RREQ_MAX_ATTEMPTS    = 2         # max RREQ floods before giving up on a destination
-SEEN_TTL             = 120       # seconds before a _seen entry expires (handles seq reuse after reboot)
 
 # IDs
 GROUND_STATION_ID = 99
@@ -63,6 +64,9 @@ CTRL_BEACON            = 6   # payload: [0=disable | 1=enable] — toggle beacon
 CTRL_PING              = 7   # payload: [] — receiver does nothing; sender uses ACK for RSSI/RTT measurement
 CTRL_GET_NEIGHBOURS    = 8   # payload: [] — request alive neighbour table; egg replies with CTRL_NEIGHBOURS_REPORT
 CTRL_NEIGHBOURS_REPORT = 9   # payload: [node_id, count, n0, n1, ...] — alive neighbours, sent to GROUND_STATION_ID
+CTRL_GET_ROUTES        = 10  # payload: [] — request route table dump; egg replies with CTRL_ROUTES_REPORT
+CTRL_ROUTES_REPORT     = 11  # payload: [node_id, count, dst_0, next_hop_0, dst_1, next_hop_1, ...] — route table
+CTRL_UWB_DISABLE       = 12  # payload: [0=disable | 1=enable] — hold/release UWB reset pin to save power
 
 # ── Packet-kind colours ───────────────────────────────────────────────────────
 COLOUR_BEACON = (255, 165,   0)   # Orange

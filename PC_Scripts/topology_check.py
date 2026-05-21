@@ -51,6 +51,7 @@ NUS_TX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"   # egg → PC (notify)
 NUS_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"   # PC → egg (write)
 
 BT_CMD_GET_NEIGHBOURS = 0xD4
+BT_CMD_GET_ROUTES     = 0xD5
 DEBUG_EGG_NAME        = "egg_99"
 DEBUG_EGG_ID          = 99
 DEFAULT_TIMEOUT       = 15.0   # seconds to wait for reports after a broadcast
@@ -82,10 +83,11 @@ class TopologyCheck:
     """
 
     def __init__(self, client: BleakClient, timeout: float = DEFAULT_TIMEOUT):
-        self.client  = client
-        self.timeout = timeout
+        self.client        = client
+        self.timeout       = timeout
         self.reports: dict[int, list[int]] = {}
-        self._buf    = ""   # accumulates partial lines across BLE 20-byte chunks
+        self.route_reports: dict[int, dict[int, int]] = {}   # node_id -> {dst: next_hop}
+        self._buf          = ""   # accumulates partial lines across BLE 20-byte chunks
 
     # ── Connection helper ─────────────────────────────────────────────────────
 
@@ -119,7 +121,7 @@ class TopologyCheck:
     # ── High-level API ────────────────────────────────────────────────────────
 
     async def verify(self, expected: dict[int, list[int]], timeout: float | None = None) -> bool:
-        """Broadcast a query, collect responses, compare, and print results.
+        """Unicast a query to each expected node, collect responses, compare, and print results.
 
         This is the one-call API for use at the top of a test script.
 
@@ -131,22 +133,111 @@ class TopologyCheck:
             True if every node in expected reports exactly the expected neighbours.
         """
         self.reports.clear()
-        await self.query_all()
+        await self.query_all(node_ids=list(expected.keys()))
         await self.collect(expected_ids=list(expected.keys()),
                            timeout=timeout or self.timeout)
         return self.compare(expected)
 
     # ── Query ─────────────────────────────────────────────────────────────────
 
-    async def query_all(self):
-        """Broadcast CTRL_GET_NEIGHBOURS — every egg in the mesh responds."""
-        print("Querying all eggs for active neighbours (broadcast)...")
-        await self._send(bytes([BT_CMD_GET_NEIGHBOURS, 0xFF]))
+    async def query_all(self, node_ids: list[int] | None = None):
+        """Unicast CTRL_GET_NEIGHBOURS to each egg in node_ids.
+
+        If node_ids is None, falls back to a broadcast (useful for ad-hoc discovery
+        in the interactive shell when the topology is unknown).
+        """
+        if node_ids is None:
+            print("Querying all eggs for active neighbours (broadcast)...")
+            await self._send(bytes([BT_CMD_GET_NEIGHBOURS, 0xFF]))
+        else:
+            for nid in node_ids:
+                await self.query_one(nid)
+                # Wait for this egg's unicast DATA response before querying the next
+                deadline = time.monotonic() + 3.0
+                while time.monotonic() < deadline:
+                    if nid in self.reports:
+                        break
+                    await asyncio.sleep(0.1)
 
     async def query_one(self, node_id: int):
-        """Send CTRL_GET_NEIGHBOURS to a single egg."""
+        """Send CTRL_GET_NEIGHBOURS to a single egg (unicast via egg_99)."""
         print(f"Querying egg_{node_id} for active neighbours...")
         await self._send(bytes([BT_CMD_GET_NEIGHBOURS, node_id & 0xFF]))
+
+    async def query_routes_all(self, node_ids: list[int] | None = None):
+        """Unicast CTRL_GET_ROUTES to each egg in node_ids.
+
+        Falls back to broadcast if node_ids is None.
+        """
+        if node_ids is None:
+            print("Querying all eggs for route tables (broadcast)...")
+            await self._send(bytes([BT_CMD_GET_ROUTES, 0xFF]))
+        else:
+            for nid in node_ids:
+                await self.query_routes_one(nid)
+                deadline = time.monotonic() + 3.0
+                while time.monotonic() < deadline:
+                    if nid in self.route_reports:
+                        break
+                    await asyncio.sleep(0.1)
+
+
+    async def query_routes_one(self, node_id: int):
+        """Send CTRL_GET_ROUTES to a single egg (unicast via egg_99)."""
+        print(f"Querying egg_{node_id} for route table...")
+        await self._send(bytes([BT_CMD_GET_ROUTES, node_id & 0xFF]))
+
+    async def collect_routes(self, expected_ids: list[int] | None = None,
+                             timeout: float | None = None) -> dict[int, dict[int, int]]:
+        """Wait for ROUTES_REPORT lines and return a snapshot of self.route_reports."""
+        deadline = time.monotonic() + (timeout or self.timeout)
+        while time.monotonic() < deadline:
+            await asyncio.sleep(0.2)
+            if expected_ids and set(expected_ids).issubset(self.route_reports):
+                break
+        return dict(self.route_reports)
+
+    def trace_path(self, src: int, dst: int) -> list[int]:
+        """Reconstruct the forwarding path from src to dst using collected route tables.
+
+        Returns the ordered list of node IDs from src to dst (inclusive), or an
+        empty list if the path cannot be determined from the gathered route data.
+        """
+        path = [src]
+        visited = {src}
+        current = src
+        while current != dst:
+            routes = self.route_reports.get(current)
+            if routes is None:
+                print(f"  [trace] no route data for egg_{current}")
+                return []
+            next_hop = routes.get(dst)
+            if next_hop is None:
+                print(f"  [trace] egg_{current} has no route to egg_{dst}")
+                return []
+            if next_hop in visited:
+                print(f"  [trace] loop detected at egg_{next_hop}")
+                return []
+            path.append(next_hop)
+            visited.add(next_hop)
+            current = next_hop
+        return path
+
+    def print_routing_subgraph(self):
+        """Print the routing subgraph reconstructed from all route_reports."""
+        print(f"\n{_BOLD}{'='*52}{_RESET}")
+        print(f"{_BOLD}  ROUTING SUBGRAPH{_RESET}")
+        print(f"{_BOLD}{'='*52}{_RESET}")
+        if not self.route_reports:
+            print("  (no route reports collected)")
+        for node_id in sorted(self.route_reports):
+            routes = self.route_reports[node_id]
+            if routes:
+                pairs = "  ".join(f"{dst}→{nh}" for dst, nh in sorted(routes.items()))
+                print(f"  egg_{node_id:<3}  {pairs}")
+            else:
+                print(f"  egg_{node_id:<3}  (empty route table)")
+        print(f"{_BOLD}{'='*52}{_RESET}\n")
 
     # ── Collect ───────────────────────────────────────────────────────────────
 
@@ -232,6 +323,8 @@ class TopologyCheck:
             print(f"  egg_99: {line}")
             if line.startswith("NEIGHBOURS_REPORT "):
                 self._parse_report(line)
+            elif line.startswith("ROUTES_REPORT "):
+                self._parse_routes_report(line)
 
     def _parse_report(self, line: str):
         # NEIGHBOURS_REPORT node=3 alive=6,7,8
@@ -250,6 +343,32 @@ class TopologyCheck:
         self.reports[node] = neighbours
         print(f"  {_CYAN}REPORT{_RESET}  egg_{node} sees {sorted(neighbours)}")
 
+    def _parse_routes_report(self, line: str):
+        # ROUTES_REPORT node=3 routes=6->7 8->9
+        parts = line.split(None, 2)   # ["ROUTES_REPORT", "node=3", "routes=6->7 8->9"]
+        if len(parts) < 2:
+            return
+        try:
+            node = int(parts[1].split("=", 1)[1])
+        except (IndexError, ValueError):
+            print(f"  [warn] malformed routes report: {line}")
+            return
+        routes: dict[int, int] = {}
+        if len(parts) == 3:
+            route_str = parts[2]
+            if route_str.startswith("routes="):
+                route_str = route_str[len("routes="):]
+            for pair in route_str.split():
+                if "->" in pair:
+                    try:
+                        d, nh = pair.split("->", 1)
+                        routes[int(d)] = int(nh)
+                    except ValueError:
+                        pass
+        self.route_reports[node] = routes
+        pairs_str = "  ".join(f"{d}→{nh}" for d, nh in sorted(routes.items())) or "(empty)"
+        print(f"  {_CYAN}ROUTES{_RESET}  egg_{node}: {pairs_str}")
+
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -266,8 +385,19 @@ async def _cli_query(topo: TopologyCheck, target_id: int, timeout: float):
     await asyncio.sleep(timeout)
 
 
+async def _cli_routes(topo: TopologyCheck, target_id: int, timeout: float):
+    topo.route_reports.clear()
+    if target_id == 0xFF:
+        await topo.query_routes_all()   # broadcast fallback for ad-hoc use
+    else:
+        await topo.query_routes_one(target_id)
+    await topo.collect_routes(timeout=timeout)
+    topo.print_routing_subgraph()
+
+
 async def _cli_interactive(topo: TopologyCheck):
-    print("Commands:  neighbours [<id>|all]   compare <file.json>   quit")
+    print("Commands:  neighbours [<id>|all]   routes [<id>|all]   "
+          "trace <src> <dst>   compare <file.json>   quit")
     loop = asyncio.get_event_loop()
     while True:
         try:
@@ -285,6 +415,23 @@ async def _cli_interactive(topo: TopologyCheck):
             target = 0xFF if arg == "all" else int(arg)
             topo.reports.clear()
             await _cli_query(topo, target, topo.timeout)
+        elif cmd in ("routes", "r"):
+            arg = parts[1] if len(parts) > 1 else "all"
+            target = 0xFF if arg == "all" else int(arg)
+            await _cli_routes(topo, target, topo.timeout)
+        elif cmd == "trace":
+            if len(parts) < 3:
+                print("Usage: trace <src_id> <dst_id>")
+                continue
+            try:
+                src, dst = int(parts[1]), int(parts[2])
+                path = topo.trace_path(src, dst)
+                if path:
+                    print(f"  Path: {' -> '.join(f'egg_{n}' for n in path)}")
+                else:
+                    print("  Path could not be determined (collect routes first)")
+            except ValueError:
+                print("trace: IDs must be integers")
         elif cmd == "compare":
             if len(parts) < 2:
                 print("Usage: compare <topology.json>")
@@ -303,6 +450,8 @@ async def _run(args):
             await _cli_compare(topo, args.compare)
         elif args.query is not None:
             await _cli_query(topo, args.query, args.timeout)
+        elif args.routes is not None:
+            await _cli_routes(topo, args.routes, args.timeout)
         else:
             await _cli_interactive(topo)
 
@@ -319,6 +468,8 @@ def main():
                         help="Compare actual topology against this JSON file")
     parser.add_argument("--query", metavar="ID|all", type=_parse_target,
                         help="Query a specific egg ID or 'all' for broadcast")
+    parser.add_argument("--routes", metavar="ID|all", type=_parse_target,
+                        help="Dump route tables from a specific egg or 'all' (broadcast)")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT,
                         help=f"Seconds to wait for reports (default: {DEFAULT_TIMEOUT})")
     args = parser.parse_args()

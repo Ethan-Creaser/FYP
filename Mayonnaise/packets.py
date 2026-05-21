@@ -1,17 +1,22 @@
 """Packet encoding/decoding for the mesh network.
 
-Packet header (9 bytes):
-  0        version     always 0x01
+Packet header (11 bytes):
+  0        version     always 0x02
   1        kind        BEACON=1  DATA=2  BCAST=3  ACK=4
   2        src_id      original source (never changes during forwarding)
   3        dst_id      final destination (0xFF = broadcast)
   4        sender_id   node that physically transmitted this packet;
                        each forwarder overwrites this with its own ID so the
                        next hop knows who to ACK back to
-  5-6      seq         16-bit per-source sequence counter (big-endian)
-  7        ttl         decremented at each hop; drop at 0
-  8        payload_len
-  9+       payload
+  5        relay_id    designated next-hop forwarder; each forwarder looks up
+                       its route and overwrites this before re-transmitting.
+                       0xFF = any node may forward (BCAST / legacy)
+  6        boot_id     originating node's boot ID (1-254); set once at origin,
+                       never overwritten by forwarders — used for deduplication
+  7-8      seq         16-bit per-source sequence counter (big-endian)
+  9        ttl         decremented at each hop; drop at 0
+  10       payload_len
+  11+      payload
 
 Application payload structure (DATA and BCAST):
   byte 0   app_id    APP_ROUTING=0  APP_LOCALISE=1  APP_CTRL=2  APP_THERM=3
@@ -36,18 +41,20 @@ Routing payloads (app_id = APP_ROUTING):
 
 import constants
 
-MAX_PAYLOAD = 246   # 255 - 9 byte header; leaves headroom for LoRa frame overhead
+MAX_PAYLOAD = 245   # 255 - 10 byte header; leaves headroom for LoRa frame overhead
 
 
 class Packet:
-    __slots__ = ("version", "kind", "src", "dst", "sender_id", "seq", "ttl", "payload")
+    __slots__ = ("version", "kind", "src", "dst", "sender_id", "relay_id", "boot_id", "seq", "ttl", "payload")
 
-    def __init__(self, kind, src, dst, seq, ttl, payload=b"", sender_id=0, version=1):
+    def __init__(self, kind, src, dst, seq, ttl, payload=b"", sender_id=0, relay_id=0xFF, boot_id=0, version=2):
         self.version   = version
         self.kind      = kind
         self.src       = src
         self.dst       = dst
         self.sender_id = sender_id
+        self.relay_id  = relay_id
+        self.boot_id   = boot_id
         self.seq       = seq
         self.ttl       = ttl
         self.payload   = payload
@@ -56,11 +63,13 @@ class Packet:
         if len(self.payload) > MAX_PAYLOAD:
             raise ValueError("payload too large: {} > {}".format(len(self.payload), MAX_PAYLOAD))
         hdr = bytes([
-            self.version & 0xFF,
-            self.kind    & 0xFF,
-            self.src     & 0xFF,
-            self.dst     & 0xFF,
+            self.version   & 0xFF,
+            self.kind      & 0xFF,
+            self.src       & 0xFF,
+            self.dst       & 0xFF,
             self.sender_id & 0xFF,
+            self.relay_id  & 0xFF,
+            self.boot_id   & 0xFF,
         ])
         hdr += int(self.seq).to_bytes(2, "big")
         hdr += bytes([self.ttl & 0xFF, len(self.payload)])
@@ -68,25 +77,27 @@ class Packet:
 
     @classmethod
     def from_bytes(cls, data):
-        if len(data) < 9:
+        if len(data) < 11:
             raise ValueError("packet too short ({} bytes)".format(len(data)))
-        version    = data[0]
-        kind       = data[1]
-        src        = data[2]
-        dst        = data[3]
-        sender_id  = data[4]
-        seq        = int.from_bytes(data[5:7], "big")
-        ttl        = data[7]
-        payload_len = data[8]
-        if len(data) < 9 + payload_len:
+        version     = data[0]
+        kind        = data[1]
+        src         = data[2]
+        dst         = data[3]
+        sender_id   = data[4]
+        relay_id    = data[5]
+        boot_id     = data[6]
+        seq         = int.from_bytes(data[7:9], "big")
+        ttl         = data[9]
+        payload_len = data[10]
+        if len(data) < 11 + payload_len:
             raise ValueError("truncated payload")
-        payload = data[9: 9 + payload_len]
-        return cls(kind, src, dst, seq, ttl, payload, sender_id, version)
+        payload = data[11: 11 + payload_len]
+        return cls(kind, src, dst, seq, ttl, payload, sender_id, relay_id, boot_id, version)
 
     def __repr__(self):
-        return "Packet(kind={} src={} dst={} sender={} seq={} ttl={} payload_len={})".format(
+        return "Packet(kind={} src={} dst={} sender={} relay={} boot_id={} seq={} ttl={} payload_len={})".format(
             self.kind, self.src, self.dst, self.sender_id,
-            self.seq, self.ttl, len(self.payload)
+            self.relay_id, self.boot_id, self.seq, self.ttl, len(self.payload)
         )
 
 
@@ -176,10 +187,11 @@ if __name__ == "__main__":
     # Round-trip DATA
     p = make_data(1, 5, 123, 6, c.APP_LOCALISE, 1, b"hi")
     b = p.to_bytes()
-    assert len(b) == 9 + 4, "wrong length"
+    assert len(b) == 11 + 4, "wrong length"
     p2 = Packet.from_bytes(b)
     assert p2.src == 1 and p2.dst == 5 and p2.seq == 123
     assert p2.kind == c.KIND_DATA
+    assert p2.relay_id == c.BROADCAST_ID
 
     # RREQ round-trip
     r = make_rreq(src=1, seq=10, target_id=7, hop_count=0)
@@ -200,11 +212,13 @@ if __name__ == "__main__":
     target, origin_seq, hops = parse_rrep(body)
     assert target == 7 and origin_seq == 10 and hops == 3
 
-    # sender_id stamping
+    # sender_id / relay_id stamping
     p3 = make_data(1, 5, 1, 6, c.APP_CTRL, 1)
     p3.sender_id = 3
+    p3.relay_id  = 5
     b3 = p3.to_bytes()
     p4 = Packet.from_bytes(b3)
     assert p4.sender_id == 3
+    assert p4.relay_id  == 5
 
     print("packets: all self-tests passed")
