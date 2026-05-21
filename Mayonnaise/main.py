@@ -217,6 +217,7 @@ def main():
                 _BT_CMD_GET_NEIGHBOURS  = 0xD4
                 _BT_CMD_GET_ROUTES      = 0xD5
                 _BT_CMD_UWB_DISABLE     = 0xD6
+                _BT_CMD_RESET_STATE     = 0xD7
                 def _bt_rx(data):
                     if not data:
                         return
@@ -408,6 +409,10 @@ def main():
                                            bytes([1 if enabled else 0]))
                             print("UWB {} relayed to egg_{}".format(
                                 "ENABLE" if enabled else "DISABLE", target_id))
+                    elif cmd == _BT_CMD_RESET_STATE:
+                        print("BT CMD RESET_STATE: broadcasting mesh state reset")
+                        node.send_ctrl_bcast(constants.CTRL_RESET_STATE)
+                        print("RESET_STATE_OK")
                     else:
                         print("BT: unknown command:", list(data))
 
@@ -521,7 +526,6 @@ def main():
     beacon_interval_fast = getattr(constants, "BEACON_INTERVAL_FAST", 10)
     beacon_fast_duration = getattr(constants, "BEACON_FAST_DURATION", 60)
     beacon_jitter        = getattr(constants, "BEACON_JITTER", 5)
-    _boot_time  = time.time()
     next_beacon = time.time()
     next_tick   = time.time() + 5
 
@@ -533,11 +537,18 @@ def main():
                 node.tick()
                 next_tick = now + 5
 
+            # After CTRL_RESET_STATE, reschedule beacon with per-node jitter to
+            # spread out post-reset transmissions and avoid radio collisions.
+            if getattr(node, "_beacon_reset", False):
+                node._beacon_reset = False
+                next_beacon = now   # beacon already sent in reset_state(); just reset scheduler
+
             if now >= next_beacon:
-                # Use fast interval for the first beacon_fast_duration seconds after boot
+                # Use fast interval for beacon_fast_duration seconds after boot
+                # or after a reset (node.start_time is updated by reset_state()).
                 current_interval = (
                     beacon_interval_fast
-                    if now - _boot_time < beacon_fast_duration
+                    if now - node.start_time < beacon_fast_duration
                     else beacon_interval
                 )
                 # Beacon suppression: if we transmitted anything within the last

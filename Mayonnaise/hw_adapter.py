@@ -32,18 +32,18 @@ _KIND_NAMES = {1: "BCN", 2: "DATA", 3: "BCAST", 4: "ACK"}
 
 
 def _pkt_info(data):
-    if len(data) < 10:
+    if len(data) < 11:
         return "len={}".format(len(data))
     kind    = _KIND_NAMES.get(data[1], "?{}".format(data[1]))
     src     = data[2]
     dst     = "ALL" if data[3] == 255 else str(data[3])
     sender  = data[4]
-    boot_id = data[5]
-    seq     = (data[6] << 8) | data[7]
+    boot_id = data[6]
+    seq     = (data[7] << 8) | data[8]
     base    = "kind={} src={} dst={} sender={} boot={} seq={} len={}".format(
         kind, src, dst, sender, boot_id, seq, len(data))
-    if data[1] == 2 and len(data) >= 12:   # KIND_DATA — show payload hex
-        payload_hex = " ".join("{:02x}".format(b) for b in data[10:])
+    if data[1] == 2 and len(data) >= 13:   # KIND_DATA — show payload hex
+        payload_hex = " ".join("{:02x}".format(b) for b in data[11:])
         return "{} data={}".format(base, payload_hex)
     return base
 

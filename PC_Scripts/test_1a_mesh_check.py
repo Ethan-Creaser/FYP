@@ -116,7 +116,7 @@ class PingSession:
         self._done         = asyncio.Event()
 
     def on_line(self, line: str, now: float):
-        if _START_RE.match(line):
+        if _START_RE.match(line) or _ROUTE_RE.match(line):
             self._started = True
         elif _DONE_RE.match(line):
             self._done.set()
@@ -212,6 +212,7 @@ class SourceEgg:
                     tgt = int(parts.get("target", 0))
                     nh  = int(parts.get("next_hop", 0))
                     self._rrep_info = (tgt, nh, None)
+                    self._loop.call_soon_threadsafe(self._rrep_event.set)
             elif _SEND_RE.search(line):
                 m = _SEND_RE.search(line)
                 nh = m.group(4)
@@ -243,23 +244,83 @@ class SourceEgg:
             yield egg
 
 
+# ── Route trace ──────────────────────────────────────────────────────────────
+
+async def _show_route_trace(src_id: int, dst_id: int, node_ids: list):
+    """Query route tables from all nodes and print the active forwarding path."""
+    print(f"  Tracing active route egg_{src_id} → egg_{dst_id}...")
+    try:
+        async with TopologyCheck.connect(verbose=False) as tc:
+            await tc.query_routes_all(node_ids=node_ids)
+            await tc.collect_routes(timeout=10.0)
+            path = tc.trace_path(src_id, dst_id)
+            if path:
+                hops = " → ".join(f"egg_{n}" for n in path)
+                print(f"  {_CYAN}Active route: {_BOLD}{hops}{_RESET}")
+            else:
+                print(f"  {_YELLOW}Could not trace full path "
+                      f"(partial route data — check serial logs){_RESET}")
+    except Exception as e:
+        print(f"  {_YELLOW}Route trace skipped: {e}{_RESET}")
+
+
+# ── Phase 0: Mesh Formation ───────────────────────────────────────────────────
+
+async def phase_formation(topo: Topology, timeout: float = 120.0):
+    """Measure true mesh formation time with a software-synchronised start.
+
+    Returns (formation_time_s, pass_bool).
+    """
+    expected_mesh = [n for n in topo.node_ids() if n != 99]
+
+    print(f"\n{_BOLD}{'═'*62}{_RESET}")
+    print(f"{_BOLD}  PHASE 0 — Mesh Formation{_RESET}")
+    print(f"{_BOLD}{'═'*62}{_RESET}")
+    print(f"  Nodes          : {sorted(expected_mesh)}")
+    print(f"  {_YELLOW}Ensure all eggs are powered on, then press Enter.{_RESET}")
+    await _ask("")
+
+    async with TopologyCheck.connect() as tc:
+        await tc.reset_all()
+        print(f"  Reset sent — t=0. Waiting for nodes to self-report...\n")
+        reports, _ = await tc.collect_formation(expected_mesh, timeout=timeout)
+
+        missing = sorted(set(expected_mesh) - set(reports))
+        if missing:
+            print(f"\n  {_YELLOW}No report from : {missing}{_RESET}")
+
+        print(f"\n  Verifying topology...")
+        topo_ok = await tc.verify(topo.as_expected(), timeout=30.0)
+
+    if not reports:
+        print(f"  {_RED}No formation reports received{_RESET}")
+        return 0.0, False
+
+    ok = len(missing) == 0 and topo_ok
+    ft = max(reports.values())
+    col = _GREEN if ok else _YELLOW
+    print(f"\n  Formation time : {col}{ft:.1f}s{_RESET}  "
+          f"(max self-reported, from synchronized reset)")
+    return ft, ok
+
+
 # ── Phase 1: Setup & Formation ────────────────────────────────────────────────
 
 async def phase_setup(topo: Topology, timeout: float):
-    """Verify full topology via egg_99.  Returns (formation_time_s, pass_bool)."""
+    """Verify full topology via egg_99.  Returns (topology_check_time_s, pass_bool)."""
     print(f"\n{_BOLD}{'═'*62}{_RESET}")
-    print(f"{_BOLD}  PHASE 1 — Setup & Formation Check{_RESET}")
+    print(f"{_BOLD}  PHASE 1 — Topology Check{_RESET}")
     print(f"{_BOLD}{'═'*62}{_RESET}")
     print(f"  Expected nodes : {topo.node_ids()}")
 
     t0 = _time.monotonic()
     async with TopologyCheck.connect(timeout=timeout) as tc:
         ok = await tc.verify(topo.as_expected(), timeout=timeout)
-    ft = _time.monotonic() - t0
+    elapsed = _time.monotonic() - t0
 
     col = _GREEN if ok else _YELLOW
-    print(f"  Formation time : {col}{ft:.1f}s{_RESET}")
-    return ft, ok
+    print(f"  Check time     : {col}{elapsed:.1f}s{_RESET}")
+    return elapsed, ok
 
 
 # ── Route check + confirmation ────────────────────────────────────────────────
@@ -288,13 +349,14 @@ async def _confirm_route(src: "SourceEgg", dst: int):
 
 # ── Phase 2: PDR Baseline ─────────────────────────────────────────────────────
 
-async def phase_baseline(src: SourceEgg, dst: int, n: int) -> float:
+async def phase_baseline(src: SourceEgg, dst: int, n: int, node_ids: list) -> float:
     """Send N pings A → C with no failures.  Returns PDR."""
     print(f"\n{_BOLD}{'═'*62}{_RESET}")
     print(f"{_BOLD}  PHASE 2 — PDR Baseline  "
           f"egg_{src.node_id} → egg_{dst}{_RESET}")
     print(f"{_BOLD}{'═'*62}{_RESET}")
     await _confirm_route(src, dst)
+    await _show_route_trace(src.node_id, dst, node_ids)
     print(f"  Sending {n} pings...")
 
     s = await src.send_ping(dst, n)
@@ -310,7 +372,7 @@ async def phase_baseline(src: SourceEgg, dst: int, n: int) -> float:
 # ── Phase 3: One Rerouting Trial ──────────────────────────────────────────────
 
 async def phase_trial(src: SourceEgg, dst: int,
-                      n: int, trial: int) -> dict:
+                      n: int, trial: int, node_ids: list) -> dict:
     """Run one kill-B / reroute / restore-B trial.  Returns metrics dict."""
     via = 0   # set interactively at kill step
     print(f"\n{_BOLD}{'─'*62}{_RESET}")
@@ -318,14 +380,26 @@ async def phase_trial(src: SourceEgg, dst: int,
     print(f"{_BOLD}{'─'*62}{_RESET}")
     tout = n * 20 + 60   # generous timeout: rerouting can take 15-30 s per ping
 
+    # ── Reset mesh state ──────────────────────────────────────────────────────
+    expected_mesh = [nid for nid in node_ids if nid != 99]
+    async with TopologyCheck.connect(verbose=False) as tc:
+        await tc.reset_all()
+        print(f"  Reset sent — waiting for mesh to reform...")
+        reports, _ = await tc.collect_formation(expected_mesh, timeout=120.0)
+    missing = sorted(set(expected_mesh) - set(reports))
+    if missing:
+        print(f"  {_YELLOW}No formation report from: {missing}{_RESET}")
+
     # ── Pre-kill baseline ──────────────────────────────────────────────────────
     await _confirm_route(src, dst)
+    await _show_route_trace(src.node_id, dst, node_ids)
     print(f"  [pre-kill]   Sending {n} pings via nominal route...")
     s_pre = await src.send_ping(dst, n)
     if not await s_pre.wait(timeout=tout):
         print(f"  {_YELLOW}Pre-kill batch timed out — partial results{_RESET}")
+    rtt_pre = f"{s_pre.avg_rtt:.0f}ms" if s_pre.avg_rtt else "—"
     print(f"  Pre-kill PDR: {_col(s_pre.pdr)}{s_pre.pdr:.1%}{_RESET}  "
-          f"({s_pre._acks}/{n})")
+          f"({s_pre._acks}/{n})  avg RTT: {rtt_pre}")
 
     # ── Kill B ────────────────────────────────────────────────────────────────
     raw = await _ask(f"\n  {_YELLOW}[ ACTION ]  Which egg to power off? "
@@ -347,9 +421,10 @@ async def phase_trial(src: SourceEgg, dst: int,
     reroute_s = None
     if s_tr.t_first_ack is not None and s_tr.t_first_ack >= t_kill:
         reroute_s = s_tr.t_first_ack - t_kill
-    rt_str = f"{reroute_s:.1f}s" if reroute_s is not None else "N/A (no ACK)"
+    rt_str  = f"{reroute_s:.1f}s" if reroute_s is not None else "N/A (no ACK)"
+    rtt_tr  = f"{s_tr.avg_rtt:.0f}ms" if s_tr.avg_rtt else "—"
     print(f"  Transition PDR: {_col(s_tr.pdr)}{s_tr.pdr:.1%}{_RESET}  "
-          f"reroute time: {rt_str}")
+          f"reroute time: {rt_str}  avg RTT: {rtt_tr}")
 
     # ── Post-reroute batch ────────────────────────────────────────────────────
     src.killed_egg = None
@@ -357,52 +432,38 @@ async def phase_trial(src: SourceEgg, dst: int,
     s_post = await src.send_ping(dst, n)
     if not await s_post.wait(timeout=tout):
         print(f"  {_YELLOW}Post-reroute batch timed out — partial results{_RESET}")
+    rtt_post = f"{s_post.avg_rtt:.0f}ms" if s_post.avg_rtt else "—"
     print(f"  Post-reroute PDR: {_col(s_post.pdr)}{s_post.pdr:.1%}{_RESET}  "
-          f"({s_post._acks}/{n})")
+          f"({s_post._acks}/{n})  avg RTT: {rtt_post}")
 
-    # ── Topology snapshot while B is still off ────────────────────────────────
-    print(f"\n  Snapshotting topology (egg_{via} off)...")
-    new_route = "—"
-    async with TopologyCheck.connect() as tc:
-        tc.reports.clear()
-        await tc.query_all()
-        await tc.collect(timeout=15.0)
-        # Source node's current alive neighbours proxy the active route
-        src_nbs = sorted(tc.reports.get(src.node_id, []))
-        if src_nbs:
-            new_route = "egg_{} → {} → egg_{}".format(
-                src.node_id, src_nbs, dst)
+    # ── Active route while B is still off ────────────────────────────────────
+    await _show_route_trace(src.node_id, dst, node_ids)
 
     # ── Restore B ─────────────────────────────────────────────────────────────
-    print(f"\n  {_YELLOW}[ ACTION ]  Power on egg_{via}.{_RESET}")
-    await _ask(f"  Press Enter once egg_{via} is back on: ")
-    t_restore = _time.monotonic()
-
-    # ── Wait for B to rejoin mesh ─────────────────────────────────────────────
-    print(f"  Waiting for egg_{via} to rejoin mesh (up to 180s)...")
+    # Open the listener before prompting so we don't miss the report if egg_via
+    # forms quickly after boot.
     rejoin_s = None
-    async with TopologyCheck.connect() as tc:
-        deadline = _time.monotonic() + 180.0
-        while _time.monotonic() < deadline:
-            tc.reports.clear()
-            await tc.query_all()
-            await tc.collect(expected_ids=[via], timeout=15.0)
-            if via in tc.reports:
-                rejoin_s = _time.monotonic() - t_restore
-                print(f"  {_GREEN}egg_{via} rejoined in {rejoin_s:.1f}s{_RESET}")
-                break
-            await asyncio.sleep(10.0)
-        else:
-            print(f"  {_RED}egg_{via} did not rejoin within 180s{_RESET}")
+    async with TopologyCheck.connect(verbose=False) as tc:
+        print(f"\n  {_YELLOW}[ ACTION ]  Power on egg_{via}.{_RESET}")
+        await _ask(f"  Press Enter once egg_{via} is back on: ")
+        print(f"  Waiting for egg_{via} to self-report rejoin (up to 180s)...")
+        reports, _ = await tc.collect_formation([via], timeout=180.0)
+    if via in reports:
+        rejoin_s = reports[via]
+        print(f"  {_GREEN}egg_{via} rejoined in {rejoin_s:.1f}s from boot{_RESET}")
+    else:
+        print(f"  {_RED}egg_{via} did not rejoin within 180s{_RESET}")
 
     return {
         "trial":        trial,
         "pdr_pre":      s_pre.pdr,
         "pdr_trans":    s_tr.pdr,
         "pdr_post":     s_post.pdr,
+        "rtt_pre_ms":   s_pre.avg_rtt,
+        "rtt_trans_ms": s_tr.avg_rtt,
+        "rtt_post_ms":  s_post.avg_rtt,
         "reroute_s":    reroute_s,
         "auto_reroute": s_tr._acks > 0,
-        "new_route":    new_route,
         "rejoin_s":     rejoin_s,
     }
 
@@ -420,8 +481,6 @@ def print_report(ft: float, ft_ok: bool, base_pdr: float, trials: list):
     print(f"\n  {_BOLD}Setup{_RESET}")
     print(f"  {chk(ft_ok)}  Topology verified     "
           f"formation_time={ft:.1f}s")
-    print(f"  {_CYAN}!{_RESET}  Route tables          "
-          f"verify per-node serial logs (manual step)")
     print(f"  {chk(ft_ok)}  Topology vs allowlist  "
           f"{'PASS' if ft_ok else 'MISMATCH'}")
 
@@ -432,19 +491,26 @@ def print_report(ft: float, ft_ok: bool, base_pdr: float, trials: list):
     rts = [r["reroute_s"] for r in trials if r["reroute_s"] is not None]
 
     print(f"\n  {_BOLD}Rerouting Trials{_RESET}")
-    hdr = (f"  {'T':>2}  {'PDR_pre':>8}  {'PDR_trans':>9}  "
-           f"{'PDR_post':>9}  {'Reroute_s':>9}  {'Auto':>5}  Rejoin_s")
+    hdr = (f"  {'T':>2}  {'PDR_pre':>8}  {'RTT_pre':>8}  {'PDR_trans':>9}  "
+           f"{'RTT_tr':>7}  {'PDR_post':>9}  {'RTT_post':>9}  "
+           f"{'Reroute_s':>9}  {'Auto':>5}  Rejoin_s")
     print(hdr)
     print("  " + "─" * (len(hdr) - 2))
     for r in trials:
-        rt = f"{r['reroute_s']:>8.1f}" if r["reroute_s"] is not None else f"{'N/A':>8}"
-        rj = f"{r['rejoin_s']:.1f}"   if r["rejoin_s"]  is not None else "N/A"
-        ar = (_GREEN + "yes" + _RESET) if r["auto_reroute"] else (_RED + "no" + _RESET)
+        rt      = f"{r['reroute_s']:>8.1f}" if r["reroute_s"]   is not None else f"{'N/A':>8}"
+        rj      = f"{r['rejoin_s']:.1f}"    if r["rejoin_s"]    is not None else "N/A"
+        ar      = (_GREEN + "yes" + _RESET) if r["auto_reroute"] else (_RED + "no" + _RESET)
+        rtt_pre = f"{r['rtt_pre_ms']:.0f}ms"   if r["rtt_pre_ms"]   else "—"
+        rtt_tr  = f"{r['rtt_trans_ms']:.0f}ms" if r["rtt_trans_ms"] else "—"
+        rtt_pst = f"{r['rtt_post_ms']:.0f}ms"  if r["rtt_post_ms"]  else "—"
         print(
             f"  {r['trial']:>2}  "
             f"{_col(r['pdr_pre'])}{r['pdr_pre']:>7.1%}{_RESET}  "
+            f"{rtt_pre:>8}  "
             f"{_col(r['pdr_trans'])}{r['pdr_trans']:>8.1%}{_RESET}  "
+            f"{rtt_tr:>7}  "
             f"{_col(r['pdr_post'])}{r['pdr_post']:>8.1%}{_RESET}  "
+            f"{rtt_pst:>9}  "
             f"{rt}  "
             f"{ar}  "
             f"{rj}"
@@ -471,19 +537,21 @@ def save_csv(ft: float, base_pdr: float, trials: list, path: str):
         w.writerow(["formation_time_s", f"{ft:.2f}"])
         w.writerow(["baseline_pdr",     f"{base_pdr:.3f}"])
         w.writerow([])
-        w.writerow(["trial", "pdr_pre", "pdr_transition", "pdr_post",
-                    "reroute_time_s", "auto_reroute", "new_route",
-                    "rejoin_time_s"])
+        w.writerow(["trial", "pdr_pre", "rtt_pre_ms", "pdr_transition",
+                    "rtt_trans_ms", "pdr_post", "rtt_post_ms",
+                    "reroute_time_s", "auto_reroute", "rejoin_time_s"])
         for r in trials:
             w.writerow([
                 r["trial"],
                 f"{r['pdr_pre']:.3f}",
+                f"{r['rtt_pre_ms']:.0f}"   if r["rtt_pre_ms"]   else "",
                 f"{r['pdr_trans']:.3f}",
+                f"{r['rtt_trans_ms']:.0f}" if r["rtt_trans_ms"] else "",
                 f"{r['pdr_post']:.3f}",
-                f"{r['reroute_s']:.2f}" if r["reroute_s"] is not None else "",
+                f"{r['rtt_post_ms']:.0f}"  if r["rtt_post_ms"]  else "",
+                f"{r['reroute_s']:.2f}"    if r["reroute_s"]    is not None else "",
                 "yes" if r["auto_reroute"] else "no",
-                r["new_route"],
-                f"{r['rejoin_s']:.2f}" if r["rejoin_s"] is not None else "",
+                f"{r['rejoin_s']:.2f}"     if r["rejoin_s"]     is not None else "",
             ])
     print(f"  Results saved to {path}")
 
@@ -506,23 +574,24 @@ async def _run(args):
     if len(paths) < 2:
         print(f"{_RED}Warning: fewer than 2 distinct paths declared — "
               f"multi-path test cannot be verified from topology file.{_RESET}")
-    ft, ft_ok = await phase_setup(topo, args.formation_timeout)
+    ft_form, ft_ok = await phase_formation(topo, timeout=args.formation_timeout)
 
+    node_ids = list(topo.node_ids())
     async with SourceEgg.connect(args.source) as src:
-        base_pdr = await phase_baseline(src, args.dest, args.pings)
+        base_pdr = await phase_baseline(src, args.dest, args.pings, node_ids)
 
         trials = []
         for i in range(1, args.trials + 1):
-            r = await phase_trial(src, args.dest, args.pings, i)
+            r = await phase_trial(src, args.dest, args.pings, i, node_ids)
             trials.append(r)
             if i < args.trials:
                 await _ask(f"\n  Ready for trial {i + 1} — press Enter: ")
 
-    print_report(ft, ft_ok, base_pdr, trials)
+    print_report(ft_form, ft_ok, base_pdr, trials)
 
     stamp    = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_path = os.path.join("test_results", f"test1a_{stamp}.csv")
-    save_csv(ft, base_pdr, trials, csv_path)
+    save_csv(ft_form, base_pdr, trials, csv_path)
 
 
 def main():
@@ -547,8 +616,8 @@ Examples:
                     help="Rerouting trials (default 5)")
     ap.add_argument("--pings",  type=int, default=10,
                     help="Pings per measurement batch (default 20)")
-    ap.add_argument("--formation-timeout", type=float, default=30.0,
-                    help="Seconds for topology verification (default 30)")
+    ap.add_argument("--formation-timeout", type=float, default=120.0,
+                    help="Seconds to wait for formation beacons and topology check (default 120)")
     args = ap.parse_args()
 
     if args.source == args.dest:

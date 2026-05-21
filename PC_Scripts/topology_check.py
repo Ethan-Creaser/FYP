@@ -52,6 +52,8 @@ NUS_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"   # PC → egg (write)
 
 BT_CMD_GET_NEIGHBOURS = 0xD4
 BT_CMD_GET_ROUTES     = 0xD5
+BT_CMD_RESET_STATE    = 0xD7
+BT_CMD_RESET_STATE    = 0xD7
 DEBUG_EGG_NAME        = "egg_99"
 DEBUG_EGG_ID          = 99
 DEFAULT_TIMEOUT       = 15.0   # seconds to wait for reports after a broadcast
@@ -82,18 +84,22 @@ class TopologyCheck:
                  after a query + collect cycle. Reset by verify() / query_all().
     """
 
-    def __init__(self, client: BleakClient, timeout: float = DEFAULT_TIMEOUT):
+    def __init__(self, client: BleakClient, timeout: float = DEFAULT_TIMEOUT, verbose: bool = True, debug: bool = False):
         self.client        = client
         self.timeout       = timeout
+        self.verbose       = verbose
+        self.debug         = debug
         self.reports: dict[int, list[int]] = {}
         self.route_reports: dict[int, dict[int, int]] = {}   # node_id -> {dst: next_hop}
-        self._buf          = ""   # accumulates partial lines across BLE 20-byte chunks
+        self._buf              = ""   # accumulates partial lines across BLE 20-byte chunks
+        self._beacon_first_seen: dict[int, float] = {}   # node_id -> monotonic time
+        self._formation_reports: dict[int, float] = {}   # node_id -> formation time (s)
 
     # ── Connection helper ─────────────────────────────────────────────────────
 
     @classmethod
     @asynccontextmanager
-    async def connect(cls, name: str = DEBUG_EGG_NAME, timeout: float = DEFAULT_TIMEOUT):
+    async def connect(cls, name: str = DEBUG_EGG_NAME, timeout: float = DEFAULT_TIMEOUT, verbose: bool = True, debug: bool = False):
         """Async context manager: scan for the debug egg, connect, and yield a ready instance.
 
         Example::
@@ -101,13 +107,15 @@ class TopologyCheck:
             async with TopologyCheck.connect() as topo:
                 ok = await topo.verify(expected)
         """
-        print(f"Scanning for {name}...")
+        if verbose:
+            print(f"Scanning for {name}...")
         device = await BleakScanner.find_device_by_name(name, timeout=10)
         if device is None:
             raise RuntimeError(f"Could not find {name} — is egg_99 powered on and in range?")
-        print(f"Found {name} at {device.address}")
+        if verbose:
+            print(f"Found {name} at {device.address}")
         async with BleakClient(device) as client:
-            instance = cls(client, timeout=timeout)
+            instance = cls(client, timeout=timeout, verbose=verbose, debug=debug)
             await instance.setup()
             yield instance
 
@@ -147,7 +155,8 @@ class TopologyCheck:
         in the interactive shell when the topology is unknown).
         """
         if node_ids is None:
-            print("Querying all eggs for active neighbours (broadcast)...")
+            if self.verbose:
+                print("Querying all eggs for active neighbours (broadcast)...")
             await self._send(bytes([BT_CMD_GET_NEIGHBOURS, 0xFF]))
         else:
             for nid in node_ids:
@@ -161,7 +170,8 @@ class TopologyCheck:
 
     async def query_one(self, node_id: int):
         """Send CTRL_GET_NEIGHBOURS to a single egg (unicast via egg_99)."""
-        print(f"Querying egg_{node_id} for active neighbours...")
+        if self.verbose:
+            print(f"Querying egg_{node_id} for active neighbours...")
         await self._send(bytes([BT_CMD_GET_NEIGHBOURS, node_id & 0xFF]))
 
     async def query_routes_all(self, node_ids: list[int] | None = None):
@@ -170,7 +180,8 @@ class TopologyCheck:
         Falls back to broadcast if node_ids is None.
         """
         if node_ids is None:
-            print("Querying all eggs for route tables (broadcast)...")
+            if self.verbose:
+                print("Querying all eggs for route tables (broadcast)...")
             await self._send(bytes([BT_CMD_GET_ROUTES, 0xFF]))
         else:
             for nid in node_ids:
@@ -184,7 +195,8 @@ class TopologyCheck:
 
     async def query_routes_one(self, node_id: int):
         """Send CTRL_GET_ROUTES to a single egg (unicast via egg_99)."""
-        print(f"Querying egg_{node_id} for route table...")
+        if self.verbose:
+            print(f"Querying egg_{node_id} for route table...")
         await self._send(bytes([BT_CMD_GET_ROUTES, node_id & 0xFF]))
 
     async def collect_routes(self, expected_ids: list[int] | None = None,
@@ -320,11 +332,16 @@ class TopologyCheck:
             line = line.rstrip("\r")
             if not line:
                 continue
-            print(f"  egg_99: {line}")
+            if self.debug:
+                print(f"  egg_99: {line}")
             if line.startswith("NEIGHBOURS_REPORT "):
                 self._parse_report(line)
             elif line.startswith("ROUTES_REPORT "):
                 self._parse_routes_report(line)
+            elif " BEACON from=" in line:
+                self._parse_beacon(line)
+            elif line.startswith("FORMATION_REPORT "):
+                self._parse_formation_report(line)
 
     def _parse_report(self, line: str):
         # NEIGHBOURS_REPORT node=3 alive=6,7,8
@@ -368,6 +385,86 @@ class TopologyCheck:
         self.route_reports[node] = routes
         pairs_str = "  ".join(f"{d}→{nh}" for d, nh in sorted(routes.items())) or "(empty)"
         print(f"  {_CYAN}ROUTES{_RESET}  egg_{node}: {pairs_str}")
+
+    def _parse_formation_report(self, line: str):
+        # FORMATION_REPORT node=1 time=4.2s
+        try:
+            kv = {}
+            for tok in line.split()[1:]:
+                if "=" in tok:
+                    k, v = tok.split("=", 1)
+                    kv[k] = v.rstrip("s")
+            node_id = int(kv["node"])
+            ft_s    = float(kv["time"])
+            self._formation_reports[node_id] = ft_s
+            print(f"  {_GREEN}FORMED{_RESET}  egg_{node_id} fully connected at {ft_s:.1f}s after boot")
+        except (KeyError, ValueError):
+            pass
+
+    async def collect_formation(self, expected_ids: list, timeout: float = 120.0) -> tuple:
+        """Wait for FORMATION_REPORT from all expected nodes.
+        Returns (reports_dict, all_reported_bool)."""
+        self._formation_reports.clear()
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            await asyncio.sleep(0.5)
+            if set(expected_ids).issubset(self._formation_reports):
+                break
+        ok = set(expected_ids).issubset(self._formation_reports)
+        return dict(self._formation_reports), ok
+
+    def _parse_beacon(self, line: str):
+        # "[99] BEACON from=1 hops_to_ground=1"
+        try:
+            for tok in line.split():
+                if tok.startswith("from="):
+                    node_id = int(tok.split("=", 1)[1])
+                    if node_id not in self._beacon_first_seen:
+                        self._beacon_first_seen[node_id] = time.monotonic()
+                    return
+        except (ValueError, IndexError):
+            pass
+
+    async def reset_all(self):
+        """Send CTRL_RESET_STATE broadcast via egg_99 to wipe mesh state on all nodes."""
+        if self.verbose:
+            print("Broadcasting mesh state reset to all nodes...")
+        await self._send(bytes([BT_CMD_RESET_STATE]))
+
+    async def reset_all(self):
+        """Broadcast CTRL_RESET_STATE via egg_99 to synchronously wipe mesh state."""
+        if self.verbose:
+            print("Broadcasting mesh state reset to all nodes...")
+        await self._send(bytes([BT_CMD_RESET_STATE]))
+
+    async def watch_formation(self, expected_ids: list, timeout: float = 120.0, clear: bool = True) -> tuple:
+        """Listen for beacons from expected_ids and record when each first appears.
+
+        Returns (formation_time_s, seen_set).
+        formation_time_s is the span from the first beacon heard to the last.
+        Prints a live join event for each node as it appears.
+        """
+        if clear:
+            self._beacon_first_seen.clear()
+        deadline = time.monotonic() + timeout
+        notified: set = set()
+        t_first = None
+
+        while time.monotonic() < deadline:
+            await asyncio.sleep(0.2)
+            for nid in sorted((set(self._beacon_first_seen) & set(expected_ids)) - notified):
+                t = self._beacon_first_seen[nid]
+                if t_first is None:
+                    t_first = t
+                print(f"  {_GREEN}✓{_RESET}  egg_{nid} heard  (+{t - t_first:.1f}s)")
+                notified.add(nid)
+            if set(expected_ids).issubset(notified):
+                break
+
+        seen = set(self._beacon_first_seen) & set(expected_ids)
+        times = [self._beacon_first_seen[n] for n in seen]
+        ft = (max(times) - min(times)) if len(times) >= 2 else (0.0 if times else None)
+        return ft, seen
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────

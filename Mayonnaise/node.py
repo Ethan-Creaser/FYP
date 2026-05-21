@@ -37,6 +37,7 @@ class Node:
         self.localise_app  = None     # set by LocaliseApp.__init__
         self.beacon_enabled = True    # overridden from identity.bin at boot; toggled by CTRL_BEACON
         self.start_time    = time.time()
+        self._start_ticks  = _ticks_ms()
 
         # Permanent direct route to the ground station — seeded at boot,
         # never evicted (RouteTable guards it in penalize/invalidate_next_hop).
@@ -47,8 +48,9 @@ class Node:
                 1,
             )
 
-        self._seq       = 1
-        self._last_tx_time = 0        # updated on every send; used for beacon suppression
+        self._seq              = 1
+        self._last_tx_time     = 0    # updated on every send; used for beacon suppression
+        self._formation_reported = False
 
         # Duplicate suppression: (src, seq) -> timestamp of first receipt
         self._seen = {}
@@ -115,6 +117,37 @@ class Node:
         pkt = packets.make_beacon(src=self.node_id, seq=seq, hops_to_ground=h)
         print("[{}] BEACON seq={} hops_to_ground={}".format(self.node_id, seq, h))
         self.send_packet(pkt)
+
+    def send_ctrl_bcast(self, subtype, data=b""):
+        """Flood an APP_CTRL command to all nodes in the mesh."""
+        seq = self.next_seq()
+        pkt = packets.make_bcast(
+            src=self.node_id, seq=seq, ttl=constants.MAX_TTL,
+            app_id=constants.APP_CTRL, subtype=subtype, data=data,
+        )
+        self.send_packet(pkt)
+
+    def reset_state(self):
+        """Synchronized state wipe for formation-time measurement.
+        Clears neighbour/route tables and re-enters fast beacon mode.
+        main.py schedules the first post-reset beacon with per-node jitter
+        to avoid simultaneous transmissions causing collisions."""
+        allowlist = self.neighbours.allowlist
+        self.neighbours          = NeighbourTable(allowlist=allowlist)
+        self.routes              = RouteTable()
+        self.outstanding.clear()
+        self.pending_forwards.clear()
+        self._pending_data.clear()
+        self._rreq_pending.clear()
+        self._seen.clear()
+        if self.node_id != constants.GROUND_STATION_ID:
+            self.routes.set_route(constants.GROUND_STATION_ID, constants.GROUND_STATION_ID, 1)
+        self.start_time          = time.time()
+        self._start_ticks        = _ticks_ms()
+        self._beacon_reset       = True   # signals main.py to reset beacon scheduler
+        self._formation_reported = False
+        print("[{}] RESET_STATE — reformation starting".format(self.node_id))
+        self.send_beacon()   # immediate beacon, same as power-on
 
     def send_data(self, dst, app_id, subtype, data=b"", ttl=constants.MAX_TTL):
         """Send an application DATA packet.
@@ -273,6 +306,7 @@ class Node:
         h = int(pkt.payload[0]) if pkt.payload else 255
         self.neighbours.update(pkt.src, hops_to_ground=(None if h == 255 else h))
         print("[{}] BEACON from={} hops_to_ground={}".format(self.node_id, pkt.src, h))
+        self._check_formation()
 
     def _compute_hops_to_ground(self):
         if self.node_id == constants.GROUND_STATION_ID:
@@ -311,6 +345,11 @@ class Node:
             if app_id == constants.APP_ROUTING:
                 self._handle_routing_data(subtype, body, from_id)
             else:
+                if app_id == constants.APP_CTRL:
+                    # Cache reverse route so CTRL responses (e.g. NEIGHBOURS_REPORT)
+                    # can reply without needing RREQ — mirrors the BCAST path logic.
+                    hops = (constants.MAX_TTL - pkt.ttl) + 1
+                    self.routes.set_route(pkt.src, from_id, hops)
                 self._deliver_to_app(pkt, app_id, subtype, body)
             return
 
@@ -326,16 +365,16 @@ class Node:
             print("[{}] DROP src={} seq={} ttl expired".format(
                 self.node_id, pkt.src, pkt.seq))
             return
-        if not self.neighbours.is_allowed(pkt.dst):
-            print("[{}] DROP src={} seq={} dst={} not in allowlist".format(
-                self.node_id, pkt.src, pkt.seq, pkt.dst))
-            return
-
         # Look up our next hop toward dst — drop if we have no route
         fwd_next_hop = self.routes.get_next_hop(pkt.dst)
         if fwd_next_hop is None:
             print("[{}] DROP src={} seq={} no route to {}".format(
                 self.node_id, pkt.src, pkt.seq, pkt.dst))
+            return
+
+        if not self.neighbours.is_allowed(fwd_next_hop):
+            print("[{}] DROP src={} seq={} next_hop={} not in allowlist".format(
+                self.node_id, pkt.src, pkt.seq, fwd_next_hop))
             return
 
         pkt.ttl -= 1
@@ -370,6 +409,16 @@ class Node:
         print("[{}] DELIVER src={} app={} sub={} len={}".format(
             self.node_id, pkt.src, app_id, subtype, len(body)))
 
+        if app_id == constants.APP_CTRL:
+            if not self._handle_mesh_ctrl(pkt.src, subtype, body):
+                loc = getattr(self, "localise_app", None)
+                if loc:
+                    try:
+                        loc.on_ctrl(pkt.src, subtype, body)
+                    except Exception as e:
+                        print("[{}] localise on_ctrl error: {}".format(self.node_id, e))
+            return
+
         loc = getattr(self, "localise_app", None)
         if loc is None:
             return
@@ -379,13 +428,6 @@ class Node:
                 loc.on_rx(pkt.src, subtype, body)
             except Exception as e:
                 print("[{}] localise on_rx error: {}".format(self.node_id, e))
-
-        elif app_id == constants.APP_CTRL:
-            if not self._handle_mesh_ctrl(pkt.src, subtype, body):
-                try:
-                    loc.on_ctrl(pkt.src, subtype, body)
-                except Exception as e:
-                    print("[{}] localise on_ctrl error: {}".format(self.node_id, e))
 
     # ── BCAST ─────────────────────────────────────────────────────────────────
 
@@ -432,6 +474,18 @@ class Node:
         Returns True if the subtype was handled here so callers can skip
         forwarding to localise_app.  Returns False for unrecognised subtypes.
         """
+        if subtype == constants.CTRL_FORMATION_REPORT:
+            if len(body) >= 3:
+                node_id = body[0]
+                ft_s    = ((body[1] << 8) | body[2]) / 10.0
+                print("FORMATION_REPORT node={} time={:.1f}s".format(node_id, ft_s))
+            return True
+
+        if subtype == constants.CTRL_RESET_STATE:
+            if self.node_id != constants.GROUND_STATION_ID:
+                self.reset_state()
+            return True
+
         if subtype == constants.CTRL_GET_NEIGHBOURS:
             target  = body[0] if body else constants.BROADCAST_ID
             node_id = self.node_id
@@ -634,6 +688,35 @@ class Node:
         self._check_outstanding()
         self._check_rreq_timeouts()
         self._expire_pending_forwards()
+        self._check_formation()
+
+    def _check_formation(self):
+        """Report formation time to GS once all mesh neighbours (excluding GS itself)
+        are alive. Called on every beacon receipt and also on each tick as a fallback."""
+        if self._formation_reported:
+            return
+        if self.node_id == constants.GROUND_STATION_ID:
+            return
+        allowlist = self.neighbours.allowlist
+        if not allowlist:
+            return
+        mesh_peers = set(allowlist) - {constants.GROUND_STATION_ID}
+        if not mesh_peers:
+            return
+        alive_ids = {e.node_id for e in self.neighbours.get_alive()}
+        if not mesh_peers.issubset(alive_ids):
+            return
+        ft_ms = _ticks_diff(_ticks_ms(), self._start_ticks)
+        ft_s  = ft_ms / 1000.0
+        ft_ds = min(int(ft_s * 10), 0xFFFF)
+        self._formation_reported = True
+        print("[{}] FORMATION_COMPLETE time={:.1f}s".format(self.node_id, ft_s))
+        self.send_data(
+            constants.GROUND_STATION_ID,
+            constants.APP_CTRL,
+            constants.CTRL_FORMATION_REPORT,
+            bytes([self.node_id & 0xFF, (ft_ds >> 8) & 0xFF, ft_ds & 0xFF]),
+        )
 
     def _age_neighbours(self):
         for node_id in self.neighbours.get_newly_lost():

@@ -13,8 +13,8 @@ MAX_TTL              = 6
 DEFAULT_ROUTE_TTL_MS = 300_000   # 5 minutes
 HOP_ACK_TIMEOUT      = 5         # seconds before retrying an unACKed hop
 MAX_HOP_RETRIES      = 3
-RREQ_TIMEOUT         = 3         # seconds to wait for RREP before retrying
-RREQ_MAX_ATTEMPTS    = 2         # max RREQ floods before giving up on a destination
+RREQ_TIMEOUT         = 6         # seconds to wait for RREP before retrying
+RREQ_MAX_ATTEMPTS    = 3         # max RREQ floods before giving up on a destination
 
 # IDs
 GROUND_STATION_ID = 99
@@ -67,6 +67,8 @@ CTRL_NEIGHBOURS_REPORT = 9   # payload: [node_id, count, n0, n1, ...] — alive 
 CTRL_GET_ROUTES        = 10  # payload: [] — request route table dump; egg replies with CTRL_ROUTES_REPORT
 CTRL_ROUTES_REPORT     = 11  # payload: [node_id, count, dst_0, next_hop_0, dst_1, next_hop_1, ...] — route table
 CTRL_UWB_DISABLE       = 12  # payload: [0=disable | 1=enable] — hold/release UWB reset pin to save power
+CTRL_RESET_STATE       = 13  # payload: [] — synchronized state wipe for formation-time measurement
+CTRL_FORMATION_REPORT  = 14  # payload: [node_id, ft_ds_hi, ft_ds_lo] — time from reset to full local connectivity (deciseconds)
 
 # ── Packet-kind colours ───────────────────────────────────────────────────────
 COLOUR_BEACON = (255, 165,   0)   # Orange
