@@ -10,7 +10,8 @@ LOST_TIMEOUT    = 150
 
 # Routing / packets
 MAX_TTL              = 6
-DEFAULT_ROUTE_TTL_MS = 300_000   # 5 minutes
+# Routes are evicted by failure (penalize) or node loss (invalidate_next_hop),
+# not by time — nodes are static so cached routes stay valid indefinitely.
 HOP_ACK_TIMEOUT      = 5         # seconds before retrying an unACKed hop
 MAX_HOP_RETRIES      = 3
 RREQ_TIMEOUT         = 6         # seconds to wait for RREP before retrying

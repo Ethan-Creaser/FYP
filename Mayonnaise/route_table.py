@@ -1,7 +1,5 @@
 """Simple route cache for next-hop routes."""
 
-import time
-# avoid typing imports for MicroPython
 import constants
 
 
@@ -10,11 +8,9 @@ class RouteEntry:
         self.dest = dest
         self.next_hop = next_hop
         self.hops = hops
-        self.last_used = time.time()
         self.failures = 0
 
     def touch(self):
-        self.last_used = time.time()
         self.failures = 0
 
 

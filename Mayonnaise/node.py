@@ -6,14 +6,17 @@ No typing imports. No dataclasses. No __future__ annotations.
 
 import time
 import json
+import random
 
 try:
-    from utime import ticks_ms as _ticks_ms, ticks_diff as _ticks_diff
+    from utime import ticks_ms as _ticks_ms, ticks_diff as _ticks_diff, sleep_ms as _sleep_ms
 except ImportError:
     def _ticks_ms():
         return int(time.time() * 1000)
     def _ticks_diff(a, b):
         return a - b
+    def _sleep_ms(ms):
+        time.sleep(ms / 1000.0)
 
 import constants
 import packets
@@ -139,7 +142,6 @@ class Node:
         self.pending_forwards.clear()
         self._pending_data.clear()
         self._rreq_pending.clear()
-        self._seen.clear()
         if self.node_id != constants.GROUND_STATION_ID:
             self.routes.set_route(constants.GROUND_STATION_ID, constants.GROUND_STATION_ID, 1)
         self.start_time          = time.time()
@@ -448,9 +450,11 @@ class Node:
             self.routes.set_route(pkt.src, from_id, hops)
             self._deliver_bcast_to_app(pkt, app_id, subtype, body)
 
-        # Rebroadcast with decremented TTL
+        # Rebroadcast with decremented TTL — random backoff staggers simultaneous
+        # rebroadcasts from multiple neighbours, reducing collisions with RREP.
         if pkt.ttl > 1:
             pkt.ttl -= 1
+            _sleep_ms(random.randint(20, 150))
             self.send_packet(pkt)
 
     def _deliver_bcast_to_app(self, pkt, app_id, subtype, body):
@@ -565,10 +569,11 @@ class Node:
             # Cache the reverse path to the origin (works for both direct and relayed RREQs)
             self.routes.set_route(origin_id, from_id, hop_count + 1)
 
-            print("[{}] RREQ origin={} target={} hops={}".format(
-                self.node_id, origin_id, target_id, hop_count))
+            print("[{}] RREQ origin={} target={} hops={} from={}".format(
+                self.node_id, origin_id, target_id, hop_count, from_id))
 
             if target_id == self.node_id:
+                pkt.ttl = 0   # suppress rebroadcast — RREP covers the return path
                 if self.node_id != constants.GROUND_STATION_ID:
                     self._send_rrep(origin_id, origin_seq, hop_count + 1)
             else:
@@ -584,6 +589,7 @@ class Node:
                 print("[{}] RECOVERY lost={}".format(self.node_id, lost_id))
 
     def _send_rrep(self, origin_id, origin_seq, hop_count):
+        _sleep_ms(random.randint(100, 250))   # wait for RREQ flood to clear before sending RREP
         seq = self.next_seq()
         pkt = packets.make_rrep(
             src=self.node_id,

@@ -82,52 +82,143 @@ def _c(enabled, *codes):
     return "".join(codes) if enabled else ""
 
 
+# ── Field highlighters ────────────────────────────────────────────────────────
+
+_SEQ_RE     = re.compile(r'(seq=)(\d+)')
+_ATTEMPT_RE = re.compile(r'(attempt=)(\d+)')
+_RTT_RE     = re.compile(r'(rtt_ms=)(\d+)')
+_HOP_RE     = re.compile(r'(hops=)(\d+)')
+_NODE_RE    = re.compile(r'(src=|dst=|from=|origin=|target=|relay=|next_hop=|node=)(\d+|ALL)')
+
+
+def _bold(s, colour, *codes):
+    """Wrap s in bold + codes then restore colour."""
+    if not colour:
+        return s
+    return BOLD + "".join(codes) + s + RESET + "".join(colour)
+
+
+def _highlight(s, colour, base_codes):
+    """Apply field-level bold highlights inside an already-coloured line."""
+    if not colour:
+        return s
+    restore = "".join(base_codes)
+    s = _SEQ_RE.sub(    lambda m: m.group(1) + BOLD + FG_WHITE  + m.group(2) + RESET + restore, s)
+    s = _ATTEMPT_RE.sub(lambda m: m.group(1) + BOLD + FG_YELLOW + m.group(2) + RESET + restore, s)
+    s = _RTT_RE.sub(    lambda m: m.group(1) + BOLD + FG_GREEN  + m.group(2) + RESET + restore, s)
+    return s
+
+
 def colourise(line, colour):
     s = line.rstrip()
     if not colour:
         return s
 
-    # Separator lines
-    if s.startswith("-") and s.replace("-", "") == "":
-        return _c(colour, DIM, FG_GREY) + s + RESET
-    if s.startswith("=") and s.replace("=", "") == "":
+    # ── Separator lines ───────────────────────────────────────────────────────
+    if (s.startswith("-") and s.replace("-", "") == "") or \
+       (s.startswith("=") and s.replace("=", "") == ""):
         return _c(colour, DIM, FG_GREY) + s + RESET
 
-    # Tagged log lines  [TX …] [RX …] [RELAY …]
-    if s.startswith("["):
-        if "[TX"    in s: return _c(colour, FG_BLUE)           + s + RESET
-        if "[RX"    in s: return _c(colour, FG_MAGENTA)        + s + RESET
-        if "[RELAY" in s: return _c(colour, FG_CYAN)           + s + RESET
+    # ── Radio TX lines — colour by packet kind ────────────────────────────────
+    if "[radio] TX" in s:
+        if "kind=BCN" in s:
+            base = (DIM, FG_GREEN)
+        elif "kind=DATA" in s:
+            base = (FG_BLUE,)
+        elif "kind=BCAST" in s:
+            base = (FG_CYAN,)
+        elif "kind=ACK" in s:
+            base = (DIM, FG_TEAL,)
+        else:
+            base = (FG_BLUE,)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+
+    # ── Radio RX lines — dimmed version of TX colours ─────────────────────────
+    if "[radio] RX" in s:
+        if "kind=BCN" in s:
+            base = (DIM, FG_GREEN)
+        elif "kind=DATA" in s:
+            base = (DIM, FG_BLUE)
+        elif "kind=BCAST" in s:
+            base = (DIM, FG_CYAN)
+        elif "kind=ACK" in s:
+            base = (DIM, FG_GREY)
+        else:
+            base = (DIM, FG_GREY)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+
+    # ── Routing — RREQ ───────────────────────────────────────────────────────
+    if "RREQ" in s:
+        if "retry" in s:
+            base = (BOLD, FG_YELLOW)
+        elif "flood" in s or "RREQ origin=" in s:
+            base = (FG_BLUE,)
+        else:
+            base = (FG_BLUE,)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+
+    # ── Routing — RREP ───────────────────────────────────────────────────────
+    if "RREP" in s:
+        base = (BOLD, FG_BLUE)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+
+    # ── Beacons ───────────────────────────────────────────────────────────────
+    if "BEACON" in s:
+        base = (FG_GREEN,)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+
+    # ── ACKs ─────────────────────────────────────────────────────────────────
+    if "ACK confirmed" in s:
+        base = (FG_GREEN,)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+    if "relay ACK" in s:
+        base = (DIM, FG_GREEN)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+
+    # ── Data flow ─────────────────────────────────────────────────────────────
+    if "FWD DATA" in s:
+        base = (FG_CYAN,)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+    if "DELIVER" in s:
+        base = (FG_MAGENTA,)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+    if " SEND " in s:
+        base = (FG_WHITE,)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+
+    # ── Retries / give up ────────────────────────────────────────────────────
+    if "give up" in s:
+        base = (BOLD, FG_RED)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+    if "retry" in s:
+        base = (FG_YELLOW,)
+        return _c(colour, *base) + _highlight(s, colour, base) + RESET
+
+    # ── Drops ─────────────────────────────────────────────────────────────────
+    if "DROP" in s:
+        return _c(colour, DIM, FG_GREY) + s + RESET
+
+    # ── Formation / state ─────────────────────────────────────────────────────
+    if "FORMATION_COMPLETE" in s or "FORMATION_REPORT" in s or "FORMED" in s:
+        return _c(colour, BOLD, FG_GREEN) + s + RESET
+    if "RESET_STATE" in s:
+        return _c(colour, BOLD, FG_YELLOW) + s + RESET
+    if "LOST neighbour" in s:
+        return _c(colour, BOLD, FG_RED) + s + RESET
+    if "RECOVERY" in s:
+        return _c(colour, FG_ORANGE) + s + RESET
+
+    # ── Reports ───────────────────────────────────────────────────────────────
+    if "NEIGHBOURS_REPORT" in s or "ROUTES_REPORT" in s:
         return _c(colour, FG_CYAN) + s + RESET
 
-    # Prefixed log lines
-    if s.startswith("Sent:"):     return _c(colour, DIM, FG_BLUE)    + s + RESET
-    if s.startswith("Received:"): return _c(colour, DIM, FG_MAGENTA) + s + RESET
-    if s.startswith("CAD:"):      return _c(colour, DIM, FG_GREY)    + s + RESET
-
-    # Severity keywords (case-insensitive check on upper)
+    # ── Errors ────────────────────────────────────────────────────────────────
     su = s.upper()
     if any(k in su for k in ("FATAL", "EXCEPTION", "TRACEBACK")):
-        return _c(colour, BOLD, FG_RED)     + s + RESET
+        return _c(colour, BOLD, FG_RED) + s + RESET
     if "ERROR" in su:
-        return _c(colour, BOLD, FG_RED)     + s + RESET
+        return _c(colour, BOLD, FG_RED) + s + RESET
     if "WARN" in su:
-        return _c(colour, BOLD, FG_YELLOW)  + s + RESET
-    if "INFO" in su and s.startswith("INFO"):
-        return _c(colour, FG_GREEN)         + s + RESET
-    if "DEBUG" in su and s.startswith("DEBUG"):
-        return _c(colour, FG_GREY)          + s + RESET
-    if "OK" in su and s.startswith("OK"):
-        return _c(colour, BOLD, FG_GREEN)   + s + RESET
-
-    # Indented key: value lines
-    if s.startswith("  ") and ":" in s:
-        colon = s.index(":")
-        return (_c(colour, FG_GREEN) + s[:colon + 1] + RESET +
-                _c(colour, FG_WHITE) + s[colon + 1:]  + RESET)
-
-    # Top-level section headers / unindented lines
-    if s and not s.startswith(" "):
         return _c(colour, BOLD, FG_YELLOW) + s + RESET
 
     return s
@@ -151,12 +242,19 @@ def should_show(raw, verbosity, filter_pat):
 
     if verbosity == VERBOSITY_QUIET:
         s = raw.strip()
-        # Only show lines that are tagged TX / RX / RELAY — no drops, no noise
-        if not s.startswith("["):
+        if "DROP" in s:
             return False
-        if "[DROP" in s:
-            return False
-        return "[TX" in s or "[RX" in s or "[RELAY" in s
+        # Always show key routing/state events
+        for kw in ("RREQ", "RREP", "BEACON", "ACK confirmed", "FWD DATA",
+                   "DELIVER", " SEND ", "retry", "give up", "FORMATION",
+                   "RESET_STATE", "LOST neighbour", "RECOVERY",
+                   "NEIGHBOURS_REPORT", "ROUTES_REPORT"):
+            if kw in s:
+                return True
+        # Show radio TX lines (skip RX to reduce noise in quiet mode)
+        if "[radio] TX" in s:
+            return True
+        return False
 
     # VERBOSITY_NORMAL — hide only blank/empty lines in stream; show everything else
     return True

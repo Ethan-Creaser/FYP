@@ -590,7 +590,8 @@ async def _run(args):
     print_report(ft_form, ft_ok, base_pdr, trials)
 
     stamp    = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_path = os.path.join("test_results", f"test1a_{stamp}.csv")
+    topo_name = os.path.splitext(os.path.basename(args.topology))[0]
+    csv_path = os.path.join("test_results", f"test1a_{topo_name}_{stamp}.csv")
     save_csv(ft_form, base_pdr, trials, csv_path)
 
 
